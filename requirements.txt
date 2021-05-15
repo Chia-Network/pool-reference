@@ -1,0 +1,1 @@
+git+git://github.com/Chia-Network/chia-blockchain.git@main#egg=chia-blockchain

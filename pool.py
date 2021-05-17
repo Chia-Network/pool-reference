@@ -53,7 +53,7 @@ class Pool:
         self.pool_fee = 0.01
 
         # This number should be held constant and be consistent for every pool in the network
-        self.iters_limit = 734000000
+        self.iters_limit = 37600000000
 
         # This number should not be changed, since users will put this into their singletons
         self.relative_lock_height = uint32(100)

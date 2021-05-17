@@ -6,8 +6,8 @@ from typing import Dict, Optional, Set, List, Tuple
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element, G2Element
 from chia.consensus.coinbase import pool_parent_id
-from chia.full_node.bundle_tools import simple_solution_generator
 from chia.protocols.pool_protocol import SubmitPartial
+from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.program import Program, INFINITE_COST, SerializedProgram
 from chia.types.coin_record import CoinRecord
@@ -24,6 +24,8 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.consensus.pot_iterations import calculate_iterations_quality, calculate_sp_interval_iters
 from chia.util.lru_cache import LRUCache
 from chia.wallet.puzzles.load_clvm import load_clvm
+from chia.wallet.transaction_record import TransactionRecord
+
 from error_codes import PoolErr
 from store import FarmerRecord, PoolStore
 
@@ -54,12 +56,13 @@ class Pool:
         self.config = config
         self.constants = constants
         self.node_rpc_client = None
+        self.wallet_rpc_client = None
 
         self.store: Optional[PoolStore] = None
 
         self.pool_fee = 0.01
 
-        # This number should be held constant and be consistent for every pool in the network
+        # This number should be held constant and be consistent for every pool in the network. DO NOT CHANGE
         self.iters_limit = 37600000000
 
         # This number should not be changed, since users will put this into their singletons
@@ -75,12 +78,18 @@ class Pool:
 
         # This is where the block rewards will get paid out to. The pool needs to support this address forever,
         # since the farmers will encode it into their singleton on the blockchain.
+
         self.default_pool_puzzle_hash: bytes32 = decode_puzzle_hash(
             "xch12ma5m7sezasgh95wkyr8470ngryec27jxcvxcmsmc4ghy7c4njssnn623q"
         )
+
+        # The pool fees will be sent to this address
         self.pool_fee_puzzle_hash: bytes32 = decode_puzzle_hash(
             "txch1h8ggpvqzhrquuchquk7s970cy0m0e0yxd4hxqwzqkpzxk9jx9nzqmd67ux"
         )
+
+        # This is the wallet ID for the wallet spending the funds from `self.default_pool_puzzle_hash`
+        self.wallet_id = "1"
 
         # We need to check for slow farmers. If farmers cannot submit proofs in time, they won't be able to win
         # any rewards either. This number can be tweaked to be more or less strict. More strict ensures everyone
@@ -91,49 +100,76 @@ class Pool:
         # reorg. That is why we have a time delay before changing any account points.
         self.partial_confirmation_delay: int = 300
 
-        self.full_node_client: Optional[FullNodeRpcClient] = None
+        # Keeps track of when each farmer last changed their difficulty, to rate limit how often they can change it
+        # This helps when the farmer is farming from two machines at the same time (with conflicting difficulties)
         self.difficulty_change_time: Dict[bytes32, uint64] = {}
 
+        # These are the phs that we want to look for on chain, that we can claim to our pool
         self.scan_p2_singleton_puzzle_hashes: Set[bytes32] = set()
-        self.blockchain_state = {"peak": None}
 
+        # Don't scan anything before this height, for efficiency (for example pool start date)
         self.scan_start_height: uint32 = uint32(1000)
+
+        # Interval for scanning and collecting the pool rewards
         self.collect_pool_rewards_interval = 600
 
         # After this many confirmations, a transaction is considered final and irreversible
         self.confirmation_security_threshold = 32
 
+        # Interval for making payout transactions to farmers
         self.payment_interval = 3600 * 24
 
-        self.confirm_partials_loop_task: Optional[asyncio.Task] = None
-        self.collect_pool_rewards_loop_task: Optional[asyncio.Task] = None
-        self.payment_loop: Optional[asyncio.Task] = None
-
-        self.max_additions_per_transaction = 500
+        # We will not make transactions with more targets than this, to ensure our transaction gets into the blockchain
+        # faster.
+        self.max_additions_per_transaction = 400
 
         # This is the list of payments that we have not sent yet, to farmers
-        self.pending_payments: List[List[Dict]] = []
+        self.pending_payments: Optional[asyncio.Queue] = None
+
+        # Keeps track of the latest state of our node
+        self.blockchain_state = {"peak": None}
+
+        # Whether or not the wallet is synced (required to make payments)
+        self.wallet_synced = False
+
+        # Tasks (infinite While loops) for different purposes
+        self.confirm_partials_loop_task: Optional[asyncio.Task] = None
+        self.collect_pool_rewards_loop_task: Optional[asyncio.Task] = None
+        self.create_payment_loop_task: Optional[asyncio.Task] = None
+        self.submit_payment_loop_task: Optional[asyncio.Task] = None
+
+        self.node_rpc_client: Optional[FullNodeRpcClient] = None
+        self.wallet_rpc_client: Optional[WalletRpcClient] = None
 
     async def start(self):
         self.store = await PoolStore.create()
         self.pending_point_partials = asyncio.Queue()
-        self.full_node_client = await FullNodeRpcClient.create(
-            self.config["self_hostname"], uint16(8555), DEFAULT_ROOT_PATH, self.config
-        )
+
+        print(self.config)
         self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
             self_hostname, uint16(8555), DEFAULT_ROOT_PATH, self.config
         )
+        self.wallet_rpc_client = await WalletRpcClient.create(
+            self.config["self_hostname"], uint16(9256), DEFAULT_ROOT_PATH, self.config
+        )
+        await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
         self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
 
         self.confirm_partials_loop_task = asyncio.create_task(self.confirm_partials_loop())
         self.collect_pool_rewards_loop_task = asyncio.create_task(self.collect_pool_rewards_loop())
+        self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
+        self.submit_payment_loop_task = asyncio.create_task(self.submit_payment_loop())
+
+        self.pending_payments = asyncio.Queue()
 
     async def stop(self):
         if self.confirm_partials_loop_task is not None:
             self.confirm_partials_loop_task.cancel()
         if self.collect_pool_rewards_loop_task is not None:
             self.collect_pool_rewards_loop_task.cancel()
+        if self.submit_payment_loop_task is not None:
+            self.submit_payment_loop_task.cancel()
 
     async def get_peak_loop(self):
         """
@@ -142,6 +178,7 @@ class Pool:
         while True:
             try:
                 self.blockchain_state = await self.full_node_client.get_blockchain_state()
+                self.wallet_synced = await self.wallet_rpc_client.get_synced()
                 await asyncio.sleep(30)
             except asyncio.CancelledError:
                 self.log.info("Cancelled get_peak_loop, closing")
@@ -166,7 +203,10 @@ class Pool:
 
                 # Only get puzzle hashes with a certain number of confirmations or more, to avoid reorg issues
                 coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hashes(
-                    scan_phs, include_spent_coins=False, end_height=peak_height - self.confirmation_security_threshold
+                    scan_phs,
+                    include_spent_coins=False,
+                    start_height=self.scan_start_height,
+                    end_height=peak_height - self.confirmation_security_threshold,
                 )
                 ph_to_amounts: Dict[bytes32, int] = {}
                 ph_to_coins: Dict[bytes32, List[CoinRecord]] = {}
@@ -228,14 +268,16 @@ class Pool:
             except Exception as e:
                 self.log.error(f"Unexpected error: {e}")
 
-    async def payment_loop(self):
+    async def create_payment_loop(self):
         """
         Calculates the points of each farmer, and splits the total funds received into coins for each farmer.
+        Saves the transactions that we should make, to `amount_to_distribute`.
         """
         while True:
             try:
-                # TODO: wait for node synced
-                # TODO: wait for wallet synced
+                if not self.blockchain_state["sync"]["synced"]:
+                    await asyncio.sleep(60)
+                    continue
                 # TODO: wait for all payments confirmed
 
                 assert len(self.pending_payments) == 0
@@ -254,10 +296,13 @@ class Pool:
                         continue
                     coins_to_distribute.append(coin_record.coin)
 
+                if len(coins_to_distribute) == 0:
+                    self.log.info("No funds to distribute.")
+                    continue
+
                 total_amount_claimed = sum([c.amount for c in coins_to_distribute])
                 pool_coin_amount = int(total_amount_claimed * self.pool_fee)
-                blockchain_fee = 0.001 * (10 ** 12)
-                amount_to_distribute = total_amount_claimed - pool_coin_amount - blockchain_fee
+                amount_to_distribute = total_amount_claimed - pool_coin_amount
 
                 async with self.store.lock:
                     # Get the points of each farmer
@@ -266,35 +311,75 @@ class Pool:
                     mojo_per_point = amount_to_distribute / total_points
                     self.log.info(f"Paying out {mojo_per_point} mojo / point")
 
-                    additions: List[List[Dict]] = []
                     additions_sub_list: List[Dict] = [
                         {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount}
                     ]
                     for points, ph in points_and_ph:
                         additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point})
 
-                        if len(additions) == self.max_additions_per_transaction:
-                            additions.append(additions_sub_list.copy())
+                        if len(additions_sub_list) == self.max_additions_per_transaction:
+                            await self.pending_payments.put(additions_sub_list.copy())
+                            self.log.info(f"Will make payments: {additions_sub_list}")
                             additions_sub_list = []
 
                     # Subtract the points from each farmer
                     await self.store.clear_farmer_points()
-
-                    # Create the payments and add to payment queue
-                    # TODO: persist this to the DB
-                    self.pending_payments = additions.copy()
-
-                for payment in self.pending_payments:
-                    # TODO: initiate payment in wallet
-                    pass
-
-                self.log.info(f"Sending payments: {additions}")
 
                 await asyncio.sleep(self.payment_interval)
             except asyncio.CancelledError:
                 self.log.info("Cancelled collect_pool_rewards_loop, closing")
                 return
             except Exception as e:
+                self.log.error(f"Unexpected error: {e}")
+
+    async def submit_payment_loop(self):
+        while True:
+            try:
+                peak_height = self.blockchain_state["peak"].height
+                if not self.blockchain_state["sync"]["synced"] or not self.wallet_synced:
+                    await asyncio.sleep(60)
+                    continue
+
+                payment_targets = await self.pending_payments.get()
+                assert len(payment_targets) > 0
+
+                # TODO: make sure you have enough to pay the blockchain fee, this will be taken out of the pool
+                # fee itself. Alternatively you can set it to 0 and wait longer
+                blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
+                try:
+                    response = await self.wallet_rpc_client.send_transaction_multi(
+                        self.wallet_id, payment_targets, fee=blockchain_fee
+                    )
+                except ValueError as e:
+                    self.log.error(f"Error making payment: {e}")
+                    await self.pending_payments.put(payment_targets)
+                    continue
+
+                transaction: TransactionRecord = response["transaction"]
+
+                while (
+                    not transaction.confirmed
+                    or not (peak_height - transaction.confirmed_at_height) > self.confirmation_security_threshold
+                ):
+                    transaction = await self.wallet_rpc_client.get_transaction(self.wallet_id, transaction.name)
+                    peak_height = self.blockchain_state["peak"].height
+                    self.log.info(
+                        f"Waiting for transaction to obtain {self.confirmation_security_threshold} confirmations"
+                    )
+                    if not transaction.confirmed:
+                        self.log.info(f"Not confirmed. In mempool? {transaction.is_in_mempool()}")
+                    else:
+                        self.log.info(f"Confirmations: {peak_height - transaction.confirmed_at_height}")
+                    await asyncio.sleep(30)
+
+                # TODO: persist in DB
+                self.log.info(f"Successfully confirmed payments {transaction}")
+
+            except asyncio.CancelledError:
+                self.log.info("Cancelled collect_pool_rewards_loop, closing")
+                return
+            except Exception as e:
+                # TODO: retry transaction if failed
                 self.log.error(f"Unexpected error: {e}")
 
     async def get_next_singleton_coin(self, spend_bundle: SpendBundle) -> Coin:

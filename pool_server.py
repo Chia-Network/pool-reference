@@ -108,6 +108,7 @@ async def start_pool_server():
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
     constants: ConsensusConstants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
     server = PoolServer(private_key, config, constants)
+    await server.start()
 
     # TODO: support TLS
     app = web.Application()

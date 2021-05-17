@@ -60,7 +60,6 @@ class PoolServer:
             "The Reference Pool",
             "https://www.chia.net/img/chia_logo.svg",
             uint64(self.pool.min_difficulty),
-            uint64(self.pool.max_difficulty),
             uint64(self.pool.relative_lock_height),
             "1.0.0",
             str(self.pool.pool_fee),

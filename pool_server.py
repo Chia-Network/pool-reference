@@ -12,7 +12,7 @@ from chia.util.hash import std_hash
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.consensus.constants import ConsensusConstants
 from chia.util.json_util import obj_to_response
-from chia.util.ints import uint64
+from chia.util.ints import uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 
@@ -35,39 +35,42 @@ class PoolServer:
 
     def wrap_http_handler(self, f) -> Callable:
         async def inner(request) -> aiohttp.web.Response:
-            request_data = await request.json()
             try:
-                res_object = await f(request_data)
+                res_object = await f(request)
                 if res_object is None:
                     res_object = {}
             except Exception as e:
                 tb = traceback.format_exc()
                 self.log.warning(f"Error while handling message: {tb}")
                 if len(e.args) > 0:
-                    res_object = {"error_code": PoolErr.SERVER_EXCEPTION, "error_message": f"{e.args[0]}"}
+                    res_object = {"error_code": PoolErr.SERVER_EXCEPTION.value, "error_message": f"{e.args[0]}"}
                 else:
-                    res_object = {"error_code": PoolErr.SERVER_EXCEPTION, "error_message": f"{e}"}
+                    res_object = {"error_code": PoolErr.SERVER_EXCEPTION.value, "error_message": f"{e}"}
 
-            return obj_to_response(res_object)
+                return obj_to_response(res_object)
+            return res_object
 
         return inner
 
-    async def index(_):
+    async def index(self, _) -> web.Response:
         return web.Response(text="Chia reference pool")
 
-    async def get_pool_info(self, _):
+    async def get_pool_info(self, _) -> web.Response:
         res: PoolInfo = PoolInfo(
             "The Reference Pool",
             "https://www.chia.net/img/chia_logo.svg",
             uint64(self.pool.min_difficulty),
-            uint64(self.pool.relative_lock_height),
+            uint32(self.pool.relative_lock_height),
             "1.0.0",
             str(self.pool.pool_fee),
             "(example) The Reference Pool allows you to pool with low fees, paying out daily using Chia.",
+            self.pool.default_pool_puzzle_hash,
         )
-        return res
+        return obj_to_response(res)
 
-    async def submit_partial(self, request) -> Dict:
+    async def submit_partial(self, request_obj) -> web.Response:
+        print("C")
+        request = await request_obj.json()
         # TODO: add rate limiting
         partial: SubmitPartial = SubmitPartial.from_json_dict(request.json())
         time_received_partial = uint64(int(time.time()))
@@ -95,16 +98,22 @@ class PoolServer:
             curr_difficulty,
         )
 
-        if "error_code" in res_dict and "error_code" == PoolErr.NOT_FOUND:
+        if "error_code" in res_dict and "error_code" == PoolErr.NOT_FOUND.value:
             asyncio.create_task(
                 await_and_call(self.pool.process_partial, partial, time_received_partial, balance, curr_difficulty)
             )
-        return res_dict
+        return obj_to_response(res_dict)
+
+
+server: PoolServer = None
+runner = None
 
 
 async def start_pool_server():
+    global server
+    global runner
     private_key: PrivateKey = AugSchemeMPL.key_gen(std_hash(b"123"))
-    config = load_config(DEFAULT_ROOT_PATH, "config.yaml", "full_node")
+    config = load_config(DEFAULT_ROOT_PATH, "config.yaml")
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
     constants: ConsensusConstants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
     server = PoolServer(private_key, config, constants)
@@ -119,8 +128,20 @@ async def start_pool_server():
             web.post("/submit_partial", server.wrap_http_handler(server.submit_partial)),
         ]
     )
-    web.run_app(app)
+    runner = aiohttp.web.AppRunner(app, access_log=None)
+    await runner.setup()
+    site = aiohttp.web.TCPSite(runner, config["self_hostname"], int(8080))
+    await site.start()
+    await asyncio.sleep(10000000)
+
+
+async def stop():
+    await server.stop()
+    await runner.cleanup()
 
 
 if __name__ == "__main__":
-    asyncio.run(start_pool_server())
+    try:
+        asyncio.run(start_pool_server())
+    except KeyboardInterrupt:
+        asyncio.run(stop())

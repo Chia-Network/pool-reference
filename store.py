@@ -118,6 +118,8 @@ class PoolStore:
         return all_phs
 
     async def get_farmer_records_for_p2_singleton_phs(self, puzzle_hashes: Set[bytes32]) -> List[FarmerRecord]:
+        if len(puzzle_hashes) == 0:
+            return []
         puzzle_hashes_db = tuple([ph.hex() for ph in list(puzzle_hashes)])
         cursor = await self.connection.execute(
             f'SELECT * from farmer WHERE p2_singleton_puzzle_hash in ({"?," * (len(puzzle_hashes_db) - 1)}?) '

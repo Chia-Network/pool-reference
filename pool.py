@@ -50,7 +50,10 @@ class SingletonState:
 
 class Pool:
     def __init__(self, private_key: PrivateKey, config: Dict, constants: ConsensusConstants):
-        self.log = logging.getLogger(__name__)
+        self.log = logging
+        # If you want to log to a file: use filename='example.log', encoding='utf-8'
+        self.log.basicConfig(level=logging.INFO)
+
         self.private_key = private_key
         self.public_key: G1Element = private_key.get_g1()
         self.config = config
@@ -88,7 +91,8 @@ class Pool:
             "txch1h8ggpvqzhrquuchquk7s970cy0m0e0yxd4hxqwzqkpzxk9jx9nzqmd67ux"
         )
 
-        # This is the wallet ID for the wallet spending the funds from `self.default_pool_puzzle_hash`
+        # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_pool_puzzle_hash`
+        self.wallet_fingerprint = 2938470744
         self.wallet_id = "1"
 
         # We need to check for slow farmers. If farmers cannot submit proofs in time, they won't be able to win
@@ -145,7 +149,6 @@ class Pool:
         self.store = await PoolStore.create()
         self.pending_point_partials = asyncio.Queue()
 
-        print(self.config)
         self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
             self_hostname, uint16(8555), DEFAULT_ROOT_PATH, self.config
@@ -153,7 +156,12 @@ class Pool:
         self.wallet_rpc_client = await WalletRpcClient.create(
             self.config["self_hostname"], uint16(9256), DEFAULT_ROOT_PATH, self.config
         )
-        await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
+        self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
+        res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
+        self.log.info(f"Logging in: {res}")
+        res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
+        self.log.info(f"Obtaining balance: {res}")
+
         self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
 
         self.confirm_partials_loop_task = asyncio.create_task(self.confirm_partials_loop())
@@ -168,8 +176,16 @@ class Pool:
             self.confirm_partials_loop_task.cancel()
         if self.collect_pool_rewards_loop_task is not None:
             self.collect_pool_rewards_loop_task.cancel()
+        if self.create_payment_loop_task is not None:
+            self.create_payment_loop_task.cancel()
         if self.submit_payment_loop_task is not None:
             self.submit_payment_loop_task.cancel()
+
+        self.wallet_rpc_client.close()
+        await self.wallet_rpc_client.await_closed()
+        self.node_rpc_client.close()
+        await self.node_rpc_client.await_closed()
+        await self.store.connection.close()
 
     async def get_peak_loop(self):
         """
@@ -177,14 +193,14 @@ class Pool:
         """
         while True:
             try:
-                self.blockchain_state = await self.full_node_client.get_blockchain_state()
+                self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
                 self.wallet_synced = await self.wallet_rpc_client.get_synced()
                 await asyncio.sleep(30)
             except asyncio.CancelledError:
                 self.log.info("Cancelled get_peak_loop, closing")
                 return
             except Exception as e:
-                self.log.error(f"Unexpected error: {e}")
+                self.log.error(f"Unexpected error in get_peak_loop: {e}")
 
     async def collect_pool_rewards_loop(self):
         """
@@ -244,7 +260,7 @@ class Pool:
 
                         singleton_coin_record: Optional[
                             CoinRecord
-                        ] = await self.full_node_client.get_coin_record_by_name(rec.singleton_coin_id)
+                        ] = await self.node_rpc_client.get_coin_record_by_name(rec.singleton_coin_id)
                         if singleton_coin_record is None:
                             self.log.error(f"Could not find singleton coin {rec.singleton_coin_id}")
                         if singleton_coin_record.spent:
@@ -254,7 +270,7 @@ class Pool:
                             rec, singleton_coin_record.coin, ph_to_coins[rec.p2_singleton_puzzle_hash]
                         )
 
-                        push_tx_response: Dict = await self.full_node_client.push_tx(spend_bundle)
+                        push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
                         if push_tx_response["status"] == "SUCCESS":
                             # TODO: save transaction in records
                             self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
@@ -266,7 +282,8 @@ class Pool:
                 self.log.info("Cancelled collect_pool_rewards_loop, closing")
                 return
             except Exception as e:
-                self.log.error(f"Unexpected error: {e}")
+                self.log.error(f"Unexpected error in collect_pool_rewards_loop: {e}")
+                await asyncio.sleep(self.collect_pool_rewards_interval)
 
     async def create_payment_loop(self):
         """
@@ -282,7 +299,7 @@ class Pool:
 
                 assert len(self.pending_payments) == 0
 
-                coin_records: List[CoinRecord] = await self.full_node_client.get_coin_records_by_puzzle_hash(
+                coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hash(
                     self.default_pool_puzzle_hash, include_spent_coins=False
                 )
 
@@ -327,10 +344,11 @@ class Pool:
 
                 await asyncio.sleep(self.payment_interval)
             except asyncio.CancelledError:
-                self.log.info("Cancelled collect_pool_rewards_loop, closing")
+                self.log.info("Cancelled create_payments_loop, closing")
                 return
             except Exception as e:
-                self.log.error(f"Unexpected error: {e}")
+                await asyncio.sleep(self.payment_interval)
+                self.log.error(f"Unexpected error in create_payments_loop: {e}")
 
     async def submit_payment_loop(self):
         while True:
@@ -376,11 +394,12 @@ class Pool:
                 self.log.info(f"Successfully confirmed payments {transaction}")
 
             except asyncio.CancelledError:
-                self.log.info("Cancelled collect_pool_rewards_loop, closing")
+                self.log.info("Cancelled submit_payment_loop, closing")
                 return
             except Exception as e:
                 # TODO: retry transaction if failed
-                self.log.error(f"Unexpected error: {e}")
+                await asyncio.sleep(60)
+                self.log.error(f"Unexpected error in submit_payment_loop: {e}")
 
     async def get_next_singleton_coin(self, spend_bundle: SpendBundle) -> Coin:
         # TODO: implement
@@ -580,7 +599,7 @@ class Pool:
     ) -> Dict:
         if partial.payload.difficulty < self.min_difficulty:
             return {
-                "error_code": PoolErr.INVALID_DIFFICULTY,
+                "error_code": PoolErr.INVALID_DIFFICULTY.value,
                 "error_message": f"Invalid difficulty {partial.payload.difficulty}. minimum: {self.min_difficulty} ",
                 "points_balance": balance,
                 "curr_difficulty": curr_difficulty,
@@ -595,7 +614,7 @@ class Pool:
 
         if not valid_sig:
             return {
-                "error_code": PoolErr.INVALID_SIGNATURE,
+                "error_code": PoolErr.INVALID_SIGNATURE.value,
                 "error_message": f"The aggregate signature is invalid {partial.rewards_and_partial_aggregate_signature}",
                 "points_balance": balance,
                 "difficulty": curr_difficulty,
@@ -603,7 +622,7 @@ class Pool:
 
         if partial.payload.proof_of_space.pool_contract_puzzle_hash != self.calculate_p2_singleton_ph(partial):
             return {
-                "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH,
+                "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
                 "error_message": f"The puzzl h {partial.rewards_and_partial_aggregate_signature}",
                 "points_balance": balance,
                 "difficulty": curr_difficulty,
@@ -616,7 +635,7 @@ class Pool:
 
         if response is None or response["reverted"]:
             return {
-                "error_code": PoolErr.NOT_FOUND,
+                "error_code": PoolErr.NOT_FOUND.value,
                 "error_message": f"Did not find signage point or EOS {partial.payload.sp_hash}",
                 "points_balance": balance,
                 "difficulty": curr_difficulty,
@@ -628,7 +647,7 @@ class Pool:
 
         if time_received_partial - node_time_received_sp > self.partial_time_limit:
             return {
-                "error_code": PoolErr.TOO_LATE,
+                "error_code": PoolErr.TOO_LATE.value,
                 "error_message": f"Received partial in {time_received_partial - node_time_received_sp}. "
                 f"Make sure your proof of space lookups are fast, and network connectivity is good. Response "
                 f"must happen in less than {self.partial_time_limit} seconds. NAS or networking farming can be an "
@@ -648,7 +667,7 @@ class Pool:
         )
         if quality_string is None:
             return {
-                "error_code": PoolErr.INVALID_PROOF,
+                "error_code": PoolErr.INVALID_PROOF.value,
                 "error_message": f"Invalid proof of space {partial.payload.sp_hash}",
                 "points_balance": balance,
                 "curr_difficulty": curr_difficulty,
@@ -664,7 +683,7 @@ class Pool:
 
         if required_iters >= self.iters_limit:
             return {
-                "error_code": PoolErr.PROOF_NOT_GOOD_ENOUGH,
+                "error_code": PoolErr.PROOF_NOT_GOOD_ENOUGH.value,
                 "error_message": f"Proof of space has required iters {required_iters}, too high for difficulty "
                 f"{curr_difficulty}",
                 "points_balance": balance,

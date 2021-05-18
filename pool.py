@@ -2,6 +2,8 @@ import asyncio
 import dataclasses
 import logging
 import time
+import traceback
+from secrets import token_bytes
 from typing import Dict, Optional, Set, List, Tuple
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element, G2Element
@@ -66,12 +68,12 @@ class Pool:
         self.pool_fee = 0.01
 
         # This number should be held constant and be consistent for every pool in the network. DO NOT CHANGE
-        self.iters_limit = 37600000000
+        self.iters_limit = self.constants.POOL_SUB_SLOT_ITERS // 64
 
         # This number should not be changed, since users will put this into their singletons
         self.relative_lock_height = uint32(100)
 
-        # TODO: potentially tweak these numbers for security and performance
+        # TODO(pool): potentially tweak these numbers for security and performance
         self.pool_url = "https://myreferencepool.com"
         self.min_difficulty = uint64(10)  # 10 difficulty is about 1 proof a day per plot
         self.default_difficulty: uint64 = uint64(10)
@@ -102,7 +104,7 @@ class Pool:
 
         # There is always a risk of a reorg, in which case we cannot reward farmers that submitted partials in that
         # reorg. That is why we have a time delay before changing any account points.
-        self.partial_confirmation_delay: int = 300
+        self.partial_confirmation_delay: int = 30
 
         # Keeps track of when each farmer last changed their difficulty, to rate limit how often they can change it
         # This helps when the farmer is farming from two machines at the same time (with conflicting difficulties)
@@ -272,7 +274,7 @@ class Pool:
 
                         push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
                         if push_tx_response["status"] == "SUCCESS":
-                            # TODO: save transaction in records
+                            # TODO(pool): save transaction in records
                             self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
                         else:
                             self.log.error(f"Error submitting transaction: {push_tx_response}")
@@ -282,7 +284,8 @@ class Pool:
                 self.log.info("Cancelled collect_pool_rewards_loop, closing")
                 return
             except Exception as e:
-                self.log.error(f"Unexpected error in collect_pool_rewards_loop: {e}")
+                error_stack = traceback.format_exc()
+                self.log.error(f"Unexpected error in collect_pool_rewards_loop: {e} {error_stack}")
                 await asyncio.sleep(self.collect_pool_rewards_interval)
 
     async def create_payment_loop(self):
@@ -295,7 +298,7 @@ class Pool:
                 if not self.blockchain_state["sync"]["synced"]:
                     await asyncio.sleep(60)
                     continue
-                # TODO: wait for all payments confirmed
+                # TODO(chia-dev): wait for all payments confirmed
 
                 assert len(self.pending_payments) == 0
 
@@ -390,19 +393,19 @@ class Pool:
                         self.log.info(f"Confirmations: {peak_height - transaction.confirmed_at_height}")
                     await asyncio.sleep(30)
 
-                # TODO: persist in DB
+                # TODO(pool): persist in DB
                 self.log.info(f"Successfully confirmed payments {transaction}")
 
             except asyncio.CancelledError:
                 self.log.info("Cancelled submit_payment_loop, closing")
                 return
             except Exception as e:
-                # TODO: retry transaction if failed
+                # TODO(pool): retry transaction if failed
                 await asyncio.sleep(60)
                 self.log.error(f"Unexpected error in submit_payment_loop: {e}")
 
     async def get_next_singleton_coin(self, spend_bundle: SpendBundle) -> Coin:
-        # TODO: implement
+        # TODO(chia-dev): implement
         pass
 
     async def create_absorb_transaction(
@@ -449,7 +452,7 @@ class Pool:
                 [CoinSolution(singleton_coin, SerializedProgram.from_bytes(bytes(singleton_full)), full_sol)],
                 G2Element(),
             )
-            # TODO: handle the case where the cost exceeds the size of the block
+            # TODO(pool): handle the case where the cost exceeds the size of the block
             aggregate_spend_bundle = SpendBundle.aggregate([aggregate_spend_bundle, new_spend])
 
             singleton_coin = await self.get_next_singleton_coin(new_spend)
@@ -496,10 +499,11 @@ class Pool:
 
             # Now we know that the partial came on time, but also that the signage point / EOS is still in the
             # blockchain. We need to check for double submissions.
-            if self.recent_points_added.get((bytes(partial.payload.owner_public_key, partial.payload.sp_hash))):
-                self.log.info(f"Double signage point submitted by: {partial.payload.owner_public_key}")
+            pos_hash = partial.payload.proof_of_space.get_hash()
+            if self.recent_points_added.get(pos_hash):
+                self.log.info(f"Double signage point submitted for proof: {partial.payload}")
                 return
-            self.recent_points_added.put((bytes(partial.payload.owner_public_key, partial.payload.sp_hash)), uint64(1))
+            self.recent_points_added.put(pos_hash, uint64(1))
 
             # Now we need to check to see that the singleton in the blockchain is still assigned to this pool
             singleton_state: Optional[SingletonState] = await self.get_and_validate_singleton_state(partial)
@@ -527,8 +531,9 @@ class Pool:
                         singleton_state.blockchain_height,
                         singleton_state.singleton_coin_id,
                         points_received,
-                        partial.payload.difficulty,
+                        partial.payload.suggested_difficulty,
                         partial.payload.rewards_target,
+                        True,
                     )
                     self.scan_p2_singleton_puzzle_hashes.add(partial.payload.proof_of_space.pool_contract_puzzle_hash)
                 else:
@@ -538,11 +543,11 @@ class Pool:
                         == farmer_record.p2_singleton_puzzle_hash
                     )
                     new_difficulty: uint64 = farmer_record.difficulty
-                    if partial.payload.difficulty != farmer_record.difficulty:
+                    if partial.payload.suggested_difficulty != farmer_record.difficulty:
                         if time.time() - self.difficulty_change_time.get(partial.payload.singleton_genesis, 0) > 3600:
                             # Only change the difficulty about once per hour, to better support multiple devices farming
                             # on the same pool group
-                            new_difficulty = partial.payload.difficulty
+                            new_difficulty = partial.payload.suggested_difficulty
                             self.difficulty_change_time[partial.payload.singleton_genesis] = uint64(int(time.time()))
 
                     if farmer_record.rewards_target != partial.payload.rewards_target:
@@ -558,13 +563,15 @@ class Pool:
                         uint64(farmer_record.points + points_received),
                         new_difficulty,
                         partial.payload.rewards_target,
+                        True,
                     )
 
                 await self.store.add_farmer_record(farmer_record)
 
             self.log.info(f"Farmer {partial.payload.owner_public_key} updated points to: " f"{farmer_record.points}")
         except Exception as e:
-            self.log.error(f"Error: {e}")
+            error_stack = traceback.format_exc()
+            self.log.error(f"Exception in confirming partial: {e} {error_stack}")
 
     async def get_and_validate_singleton_state(self, partial: SubmitPartial) -> Optional[SingletonState]:
         """
@@ -572,7 +579,7 @@ class Pool:
         our pool, with the correct parameters.
         """
 
-        # TODO: check if tasks running, if not start one
+        # TODO(chia-dev): check if tasks running, if not start one
         # wait for task to end
         # update farmer records?
         return SingletonState(
@@ -581,6 +588,8 @@ class Pool:
             self.relative_lock_height,
             self.min_difficulty,
             False,
+            0,
+            token_bytes(32),
         )
 
     @staticmethod
@@ -597,10 +606,10 @@ class Pool:
         balance: uint64,
         curr_difficulty: uint64,
     ) -> Dict:
-        if partial.payload.difficulty < self.min_difficulty:
+        if partial.payload.suggested_difficulty < self.min_difficulty:
             return {
                 "error_code": PoolErr.INVALID_DIFFICULTY.value,
-                "error_message": f"Invalid difficulty {partial.payload.difficulty}. minimum: {self.min_difficulty} ",
+                "error_message": f"Invalid difficulty {partial.payload.suggested_difficulty}. minimum: {self.min_difficulty} ",
                 "points_balance": balance,
                 "curr_difficulty": curr_difficulty,
             }
@@ -609,7 +618,7 @@ class Pool:
         pk1: G1Element = partial.payload.owner_public_key
         m1: bytes = partial.payload.rewards_target
         pk2: G1Element = partial.payload.proof_of_space.plot_public_key
-        m2: bytes = bytes(partial.payload)
+        m2: bytes = partial.payload.get_hash()
         valid_sig = AugSchemeMPL.aggregate_verify([pk1, pk2], [m1, m2], partial.rewards_and_partial_aggregate_signature)
 
         if not valid_sig:
@@ -620,7 +629,7 @@ class Pool:
                 "difficulty": curr_difficulty,
             }
 
-        if partial.payload.proof_of_space.pool_contract_puzzle_hash != self.calculate_p2_singleton_ph(partial):
+        if partial.payload.proof_of_space.pool_contract_puzzle_hash != await self.calculate_p2_singleton_ph(partial):
             return {
                 "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
                 "error_message": f"The puzzl h {partial.rewards_and_partial_aggregate_signature}",

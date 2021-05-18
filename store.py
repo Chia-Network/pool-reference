@@ -151,9 +151,9 @@ class PoolStore:
             points: uint64 = uint64(row[0])
             ph: bytes32 = bytes32(bytes.fromhex(row[1]))
             if ph in accumulated:
-                ph[accumulated] += points
+                accumulated[ph] += points
             else:
-                ph[accumulated] = points
+                accumulated[ph] = points
 
         ret: List[Tuple[uint64, bytes32]] = []
         for ph, total_points in accumulated.items():

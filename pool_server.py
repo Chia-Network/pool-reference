@@ -69,16 +69,19 @@ class PoolServer:
         return obj_to_response(res)
 
     async def submit_partial(self, request_obj) -> web.Response:
-        print("C")
+        start_time = time.time()
         request = await request_obj.json()
-        # TODO: add rate limiting
-        partial: SubmitPartial = SubmitPartial.from_json_dict(request.json())
+        self.pool.log.info(f"Received request: for {request['payload']['singleton_genesis']}")
+        # TODO(pool): add rate limiting
+        partial: SubmitPartial = SubmitPartial.from_json_dict(request)
         time_received_partial = uint64(int(time.time()))
 
         # It's important that on the first request from this farmer, the default difficulty is used. Changing the
         # difficulty requires a few minutes, otherwise farmers can abuse by setting the difficulty right under the
         # proof that they found.
-        farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.singleton_genesis)
+        farmer_record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(
+            partial.payload.singleton_genesis
+        )
         if farmer_record is not None:
             curr_difficulty: uint64 = farmer_record.difficulty
             balance = farmer_record.points
@@ -102,6 +105,7 @@ class PoolServer:
             asyncio.create_task(
                 await_and_call(self.pool.process_partial, partial, time_received_partial, balance, curr_difficulty)
             )
+        self.pool.log.info(f"Returning {res_dict}, time: {time.time() - start_time}")
         return obj_to_response(res_dict)
 
 
@@ -119,7 +123,7 @@ async def start_pool_server():
     server = PoolServer(private_key, config, constants)
     await server.start()
 
-    # TODO: support TLS
+    # TODO(pool): support TLS
     app = web.Application()
     app.add_routes(
         [
@@ -130,7 +134,7 @@ async def start_pool_server():
     )
     runner = aiohttp.web.AppRunner(app, access_log=None)
     await runner.setup()
-    site = aiohttp.web.TCPSite(runner, config["self_hostname"], int(8080))
+    site = aiohttp.web.TCPSite(runner, config["self_hostname"], int(80))
     await site.start()
     await asyncio.sleep(10000000)
 

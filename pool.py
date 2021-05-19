@@ -143,6 +143,7 @@ class Pool:
         self.collect_pool_rewards_loop_task: Optional[asyncio.Task] = None
         self.create_payment_loop_task: Optional[asyncio.Task] = None
         self.submit_payment_loop_task: Optional[asyncio.Task] = None
+        self.get_peak_loop_task: Optional[asyncio.Task] = None
 
         self.node_rpc_client: Optional[FullNodeRpcClient] = None
         self.wallet_rpc_client: Optional[WalletRpcClient] = None
@@ -170,6 +171,7 @@ class Pool:
         self.collect_pool_rewards_loop_task = asyncio.create_task(self.collect_pool_rewards_loop())
         self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
         self.submit_payment_loop_task = asyncio.create_task(self.submit_payment_loop())
+        self.get_peak_loop_task = asyncio.create_task(self.get_peak_loop())
 
         self.pending_payments = asyncio.Queue()
 
@@ -182,6 +184,8 @@ class Pool:
             self.create_payment_loop_task.cancel()
         if self.submit_payment_loop_task is not None:
             self.submit_payment_loop_task.cancel()
+        if self.get_peak_loop_task is not None:
+            self.get_peak_loop_task.cancel()
 
         self.wallet_rpc_client.close()
         await self.wallet_rpc_client.await_closed()
@@ -306,7 +310,7 @@ class Pool:
                     continue
 
                 if self.pending_payments.qsize() != 0:
-                    self.log.warning("Pending payments, waiting")
+                    self.log.warning(f"Pending payments ({self.pending_payments.qsize()}), waiting")
                     await asyncio.sleep(60)
                     continue
 
@@ -377,6 +381,7 @@ class Pool:
             try:
                 peak_height = self.blockchain_state["peak"].height
                 if not self.blockchain_state["sync"]["synced"] or not self.wallet_synced:
+                    self.log.warning("Waiting for wallet sync")
                     await asyncio.sleep(60)
                     continue
 
@@ -389,7 +394,7 @@ class Pool:
                 # fee itself. Alternatively you can set it to 0 and wait longer
                 blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
                 try:
-                    response = await self.wallet_rpc_client.send_transaction_multi(
+                    transaction: TransactionRecord = await self.wallet_rpc_client.send_transaction_multi(
                         self.wallet_id, payment_targets, fee=blockchain_fee
                     )
                 except ValueError as e:
@@ -397,7 +402,7 @@ class Pool:
                     await self.pending_payments.put(payment_targets)
                     continue
 
-                transaction: TransactionRecord = response["transaction"]
+                self.log.info(f"Transaction: {transaction}")
 
                 while (
                     not transaction.confirmed

@@ -71,7 +71,6 @@ class PoolServer:
     async def submit_partial(self, request_obj) -> web.Response:
         start_time = time.time()
         request = await request_obj.json()
-        self.pool.log.info(f"Received request: for {request['payload']['singleton_genesis']}")
         # TODO(pool): add rate limiting
         partial: SubmitPartial = SubmitPartial.from_json_dict(request)
         time_received_partial = uint64(int(time.time()))
@@ -107,7 +106,10 @@ class PoolServer:
                 await_and_call(self.pool.process_partial, partial, time_received_partial, balance, curr_difficulty)
             )
 
-        self.pool.log.info(f"Returning {res_dict}, time: {time.time() - start_time}")
+        self.pool.log.info(
+            f"Returning {res_dict}, time: {time.time() - start_time} "
+            f"singleton: {request['payload']['singleton_genesis']}"
+        )
         return obj_to_response(res_dict)
 
 

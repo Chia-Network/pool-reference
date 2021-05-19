@@ -16,7 +16,7 @@ ssi = 37600000000
 
 def do_simulation(days: int, diff: int, k: int, num: int):
     successes = 0
-    for i in range(9216 * days):
+    for i in range(int(9216 * days)):
         for j in range(num):
             # Plot filter
             if random.random() < (1.0 / 512.0):
@@ -25,6 +25,9 @@ def do_simulation(days: int, diff: int, k: int, num: int):
                     successes += 1
     return successes
 
+
+# Difficulty 1, 3 minutes with 1 plot
+print(do_simulation((1.0 / 480), 10, 22, 318))
 
 # Difficulty 1, 1 day with 1 plot
 print(do_simulation(1, 1, 32, 1))

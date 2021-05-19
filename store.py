@@ -122,7 +122,8 @@ class PoolStore:
             return []
         puzzle_hashes_db = tuple([ph.hex() for ph in list(puzzle_hashes)])
         cursor = await self.connection.execute(
-            f'SELECT * from farmer WHERE p2_singleton_puzzle_hash in ({"?," * (len(puzzle_hashes_db) - 1)}?) '
+            f'SELECT * from farmer WHERE p2_singleton_puzzle_hash in ({"?," * (len(puzzle_hashes_db) - 1)}?) ',
+            puzzle_hashes_db,
         )
         rows = await cursor.fetchall()
         records: List[FarmerRecord] = []

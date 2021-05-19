@@ -92,7 +92,8 @@ class PoolServer:
         async def await_and_call(cor, *args):
             # 10 seconds gives our node some time to get the signage point, in case we are slightly slowed down
             await asyncio.sleep(10)
-            await cor(args)
+            res = await cor(args)
+            self.pool.log.info(f"Delayed response: {res}")
 
         res_dict = await self.pool.process_partial(
             partial,
@@ -105,6 +106,7 @@ class PoolServer:
             asyncio.create_task(
                 await_and_call(self.pool.process_partial, partial, time_received_partial, balance, curr_difficulty)
             )
+
         self.pool.log.info(f"Returning {res_dict}, time: {time.time() - start_time}")
         return obj_to_response(res_dict)
 

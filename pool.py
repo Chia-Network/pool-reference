@@ -84,13 +84,13 @@ class Pool:
         # This is where the block rewards will get paid out to. The pool needs to support this address forever,
         # since the farmers will encode it into their singleton on the blockchain.
 
-        self.default_pool_puzzle_hash: bytes32 = decode_puzzle_hash(
-            "xch12ma5m7sezasgh95wkyr8470ngryec27jxcvxcmsmc4ghy7c4njssnn623q"
+        self.default_pool_puzzle_hash: bytes32 = bytes32(
+            decode_puzzle_hash("xch12ma5m7sezasgh95wkyr8470ngryec27jxcvxcmsmc4ghy7c4njssnn623q")
         )
 
         # The pool fees will be sent to this address
-        self.pool_fee_puzzle_hash: bytes32 = decode_puzzle_hash(
-            "txch1h8ggpvqzhrquuchquk7s970cy0m0e0yxd4hxqwzqkpzxk9jx9nzqmd67ux"
+        self.pool_fee_puzzle_hash: bytes32 = bytes32(
+            decode_puzzle_hash("txch1h8ggpvqzhrquuchquk7s970cy0m0e0yxd4hxqwzqkpzxk9jx9nzqmd67ux")
         )
 
         # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_pool_puzzle_hash`
@@ -120,10 +120,10 @@ class Pool:
         self.collect_pool_rewards_interval = 600
 
         # After this many confirmations, a transaction is considered final and irreversible
-        self.confirmation_security_threshold = 32
+        self.confirmation_security_threshold = 6
 
         # Interval for making payout transactions to farmers
-        self.payment_interval = 3600 * 24
+        self.payment_interval = 600
 
         # We will not make transactions with more targets than this, to ensure our transaction gets into the blockchain
         # faster.
@@ -224,13 +224,16 @@ class Pool:
                     scan_phs,
                     include_spent_coins=False,
                     start_height=self.scan_start_height,
-                    end_height=peak_height - self.confirmation_security_threshold,
+                )
+                self.log.info(
+                    f"Scanning for block rewards from {self.scan_start_height} to {peak_height}. "
+                    f"Found: {len(coin_records)}"
                 )
                 ph_to_amounts: Dict[bytes32, int] = {}
                 ph_to_coins: Dict[bytes32, List[CoinRecord]] = {}
                 not_buried_amounts = 0
                 for cr in coin_records:
-                    if cr.confirmed_block_index < peak_height - self.confirmation_security_threshold:
+                    if cr.confirmed_block_index > peak_height - self.confirmation_security_threshold:
                         not_buried_amounts += cr.coin.amount
                         continue
                     if cr.coin.puzzle_hash not in ph_to_amounts:
@@ -241,7 +244,7 @@ class Pool:
 
                 # For each p2sph, get the FarmerRecords
                 farmer_records = await self.store.get_farmer_records_for_p2_singleton_phs(
-                    set([cr.coin.puzzle_hash for cr in coin_records])
+                    set([ph for ph in ph_to_amounts.keys()])
                 )
 
                 # For each singleton, create, submit, and save a claim transaction
@@ -254,8 +257,9 @@ class Pool:
                         not_claimable_amounts += ph_to_amounts[rec.p2_singleton_puzzle_hash]
 
                 if len(coin_records) > 0:
-                    self.log.info(f"Claimable amount: {claimable_amounts}")
-                    self.log.info(f"Not claimable amount: {not_claimable_amounts}")
+                    self.log.info(f"Claimable amount: {claimable_amounts / (10**12)}")
+                    self.log.info(f"Not claimable amount: {not_claimable_amounts / (10**12)}")
+                    self.log.info(f"Not buried amounts: {not_buried_amounts / (10**12)}")
 
                 for rec in farmer_records:
                     if rec.is_pool_member:
@@ -265,6 +269,7 @@ class Pool:
                         ] = await self.node_rpc_client.get_coin_record_by_name(rec.singleton_coin_id)
                         if singleton_coin_record is None:
                             self.log.error(f"Could not find singleton coin {rec.singleton_coin_id}")
+                            continue
                         if singleton_coin_record.spent:
                             self.log.warning(f"Singleton coin {rec.singleton_coin_id} is spent")
 
@@ -296,11 +301,16 @@ class Pool:
         while True:
             try:
                 if not self.blockchain_state["sync"]["synced"]:
+                    self.log.warning("Not synced, waiting")
                     await asyncio.sleep(60)
                     continue
-                # TODO(chia-dev): wait for all payments confirmed
 
-                assert len(self.pending_payments) == 0
+                if self.pending_payments.qsize() != 0:
+                    self.log.warning("Pending payments, waiting")
+                    await asyncio.sleep(60)
+                    continue
+
+                self.log.info("Starting to create payment")
 
                 coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hash(
                     self.default_pool_puzzle_hash, include_spent_coins=False
@@ -324,6 +334,10 @@ class Pool:
                 pool_coin_amount = int(total_amount_claimed * self.pool_fee)
                 amount_to_distribute = total_amount_claimed - pool_coin_amount
 
+                self.log.info(f"Total amount claimed: {total_amount_claimed / (10 ** 12)}")
+                self.log.info(f"Pool coin amount (includes blockchain fee) {pool_coin_amount  / (10 ** 12)}")
+                self.log.info(f"Total amount to distribute: {amount_to_distribute  / (10 ** 12)}")
+
                 async with self.store.lock:
                     # Get the points of each farmer
                     points_and_ph: List[Tuple[uint64, bytes32]] = await self.store.get_farmer_points_and_ph()
@@ -342,6 +356,10 @@ class Pool:
                             self.log.info(f"Will make payments: {additions_sub_list}")
                             additions_sub_list = []
 
+                    if len(additions_sub_list) > 0:
+                        self.log.info(f"Will make payments: {additions_sub_list}")
+                        await self.pending_payments.put(additions_sub_list.copy())
+
                     # Subtract the points from each farmer
                     await self.store.clear_farmer_points()
 
@@ -350,8 +368,9 @@ class Pool:
                 self.log.info("Cancelled create_payments_loop, closing")
                 return
             except Exception as e:
+                error_stack = traceback.format_exc()
+                self.log.error(f"Unexpected error in create_payments_loop: {e} {error_stack}")
                 await asyncio.sleep(self.payment_interval)
-                self.log.error(f"Unexpected error in create_payments_loop: {e}")
 
     async def submit_payment_loop(self):
         while True:
@@ -364,7 +383,9 @@ class Pool:
                 payment_targets = await self.pending_payments.get()
                 assert len(payment_targets) > 0
 
-                # TODO: make sure you have enough to pay the blockchain fee, this will be taken out of the pool
+                self.log.info(f"Submitting a payment: {payment_targets}")
+
+                # TODO(pool): make sure you have enough to pay the blockchain fee, this will be taken out of the pool
                 # fee itself. Alternatively you can set it to 0 and wait longer
                 blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
                 try:
@@ -401,8 +422,8 @@ class Pool:
                 return
             except Exception as e:
                 # TODO(pool): retry transaction if failed
-                await asyncio.sleep(60)
                 self.log.error(f"Unexpected error in submit_payment_loop: {e}")
+                await asyncio.sleep(60)
 
     async def get_next_singleton_coin(self, spend_bundle: SpendBundle) -> Coin:
         # TODO(chia-dev): implement
@@ -645,7 +666,7 @@ class Pool:
         if response is None or response["reverted"]:
             return {
                 "error_code": PoolErr.NOT_FOUND.value,
-                "error_message": f"Did not find signage point or EOS {partial.payload.sp_hash}",
+                "error_message": f"Did not find signage point or EOS {partial.payload.sp_hash}, {response}",
                 "points_balance": balance,
                 "difficulty": curr_difficulty,
             }

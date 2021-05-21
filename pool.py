@@ -346,6 +346,10 @@ class Pool:
                     # Get the points of each farmer
                     points_and_ph: List[Tuple[uint64, bytes32]] = await self.store.get_farmer_points_and_ph()
                     total_points = sum([pt for (pt, ph) in points_and_ph])
+                    if total_points == 0:
+                        # no points recorded yet - nothing to do
+                        break
+
                     mojo_per_point = amount_to_distribute / total_points
                     self.log.info(f"Paying out {mojo_per_point} mojo / point")
 

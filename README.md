@@ -1,4 +1,4 @@
-This prototoype is not yet supported and is still in development.
+This prototype is not yet supported and is still in development.
 
 ### Minimum difficulty
 

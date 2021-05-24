@@ -82,10 +82,10 @@ class PoolServer:
             partial.payload.singleton_genesis
         )
         if farmer_record is not None:
-            curr_difficulty: uint64 = farmer_record.difficulty
+            current_difficulty: uint64 = farmer_record.difficulty
             balance = farmer_record.points
         else:
-            curr_difficulty = self.pool.default_difficulty
+            current_difficulty = self.pool.default_difficulty
             balance = uint64(0)
 
         async def await_and_call(cor, *args):
@@ -98,12 +98,12 @@ class PoolServer:
             partial,
             time_received_partial,
             balance,
-            curr_difficulty,
+            current_difficulty,
         )
 
         if "error_code" in res_dict and "error_code" == PoolErr.NOT_FOUND.value:
             asyncio.create_task(
-                await_and_call(self.pool.process_partial, partial, time_received_partial, balance, curr_difficulty)
+                await_and_call(self.pool.process_partial, partial, time_received_partial, balance, current_difficulty)
             )
 
         self.pool.log.info(

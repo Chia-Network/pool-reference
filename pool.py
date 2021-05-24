@@ -665,14 +665,12 @@ class Pool:
         partial: SubmitPartial,
         time_received_partial: uint64,
         balance: uint64,
-        curr_difficulty: uint64,
+        current_difficulty: uint64,
     ) -> Dict:
         if partial.payload.suggested_difficulty < self.min_difficulty:
             return {
                 "error_code": PoolErr.INVALID_DIFFICULTY.value,
                 "error_message": f"Invalid difficulty {partial.payload.suggested_difficulty}. minimum: {self.min_difficulty} ",
-                "points_balance": balance,
-                "curr_difficulty": curr_difficulty,
             }
 
         # Validate signatures
@@ -689,16 +687,12 @@ class Pool:
             return {
                 "error_code": PoolErr.INVALID_SIGNATURE.value,
                 "error_message": f"The aggregate signature is invalid {partial.rewards_and_partial_aggregate_signature}",
-                "points_balance": balance,
-                "difficulty": curr_difficulty,
             }
 
         if partial.payload.proof_of_space.pool_contract_puzzle_hash != await self.calculate_p2_singleton_ph(partial):
             return {
                 "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
                 "error_message": f"The puzzl h {partial.rewards_and_partial_aggregate_signature}",
-                "points_balance": balance,
-                "difficulty": curr_difficulty,
             }
 
         if partial.payload.end_of_sub_slot:
@@ -710,8 +704,6 @@ class Pool:
             return {
                 "error_code": PoolErr.NOT_FOUND.value,
                 "error_message": f"Did not find signage point or EOS {partial.payload.sp_hash}, {response}",
-                "points_balance": balance,
-                "difficulty": curr_difficulty,
             }
         node_time_received_sp = response["time_received"]
 
@@ -725,8 +717,6 @@ class Pool:
                 f"Make sure your proof of space lookups are fast, and network connectivity is good. Response "
                 f"must happen in less than {self.partial_time_limit} seconds. NAS or networking farming can be an "
                 f"issue",
-                "points_balance": balance,
-                "curr_difficulty": curr_difficulty,
             }
 
         # Validate the proof
@@ -742,15 +732,13 @@ class Pool:
             return {
                 "error_code": PoolErr.INVALID_PROOF.value,
                 "error_message": f"Invalid proof of space {partial.payload.sp_hash}",
-                "points_balance": balance,
-                "curr_difficulty": curr_difficulty,
             }
 
         required_iters: uint64 = calculate_iterations_quality(
             self.constants.DIFFICULTY_CONSTANT_FACTOR,
             quality_string,
             partial.payload.proof_of_space.size,
-            curr_difficulty,
+            current_difficulty,
             partial.payload.sp_hash,
         )
 
@@ -758,11 +746,9 @@ class Pool:
             return {
                 "error_code": PoolErr.PROOF_NOT_GOOD_ENOUGH.value,
                 "error_message": f"Proof of space has required iters {required_iters}, too high for difficulty "
-                f"{curr_difficulty}",
-                "points_balance": balance,
-                "curr_difficulty": curr_difficulty,
+                f"{current_difficulty}",
             }
 
-        await self.pending_point_partials.put((partial, time_received_partial, curr_difficulty))
+        await self.pending_point_partials.put((partial, time_received_partial, current_difficulty))
 
-        return {"points_balance": balance, "curr_difficulty": curr_difficulty}
+        return {"points_balance": balance, "current_difficulty": current_difficulty}

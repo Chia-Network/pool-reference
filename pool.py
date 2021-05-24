@@ -82,18 +82,23 @@ class Pool:
         self.recent_points_added: LRUCache = LRUCache(20000)
 
         # This is where the block rewards will get paid out to. The pool needs to support this address forever,
-        # since the farmers will encode it into their singleton on the blockchain.
+        # since the farmers will encode it into their singleton on the blockchain. WARNING: the default pool code
+        # completely spends this wallet and distributes it to users, do don't put any additional funds in here
+        # that you do not want to distribute. Even if the funds are in a different address than this one, they WILL
+        # be spent by this code! So only put funds that you want to distribute to pool members here.
 
-        self.default_pool_puzzle_hash: bytes32 = bytes32(
-            decode_puzzle_hash("xch12ma5m7sezasgh95wkyr8470ngryec27jxcvxcmsmc4ghy7c4njssnn623q")
+        # Using 1254429856
+        self.default_target_puzzle_hash: bytes32 = bytes32(
+            decode_puzzle_hash("xch1x3zc0ncx5wwmguwjesp82p8gdz9q5e7va9sj2dgqe9tvwdsrl4vqnaquh3")
         )
 
-        # The pool fees will be sent to this address
+        # The pool fees will be sent to this address. This MUST be on a different key than the target_puzzle_hash,
+        # otherwise, the fees will be sent to the users. Using 2269911172
         self.pool_fee_puzzle_hash: bytes32 = bytes32(
-            decode_puzzle_hash("txch1h8ggpvqzhrquuchquk7s970cy0m0e0yxd4hxqwzqkpzxk9jx9nzqmd67ux")
+            decode_puzzle_hash("xch1jhydnk47xl40jn3pgwjd708uk2wqzqexagy9xxjcwt2qeaumv3fq4yfvce")
         )
 
-        # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_pool_puzzle_hash`
+        # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_target_puzzle_hash`
         self.wallet_fingerprint = 2938470744
         self.wallet_id = "1"
 
@@ -276,6 +281,7 @@ class Pool:
                             continue
                         if singleton_coin_record.spent:
                             self.log.warning(f"Singleton coin {rec.singleton_coin_id} is spent")
+                            continue
 
                         spend_bundle = await self.create_absorb_transaction(
                             rec, singleton_coin_record.coin, ph_to_coins[rec.p2_singleton_puzzle_hash]
@@ -287,7 +293,9 @@ class Pool:
                             self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
                         else:
                             self.log.error(f"Error submitting transaction: {push_tx_response}")
-
+                self.scan_start_height = uint32(
+                    max(self.scan_start_height, peak_height - self.confirmation_security_threshold)
+                )
                 await asyncio.sleep(self.collect_pool_rewards_interval)
             except asyncio.CancelledError:
                 self.log.info("Cancelled collect_pool_rewards_loop, closing")
@@ -317,7 +325,7 @@ class Pool:
                 self.log.info("Starting to create payment")
 
                 coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hash(
-                    self.default_pool_puzzle_hash, include_spent_coins=False
+                    self.default_target_puzzle_hash, include_spent_coins=False
                 )
 
                 coins_to_distribute: List[Coin] = []
@@ -332,6 +340,7 @@ class Pool:
 
                 if len(coins_to_distribute) == 0:
                     self.log.info("No funds to distribute.")
+                    await asyncio.sleep(120)
                     continue
 
                 total_amount_claimed = sum([c.amount for c in coins_to_distribute])
@@ -343,8 +352,11 @@ class Pool:
                 self.log.info(f"Total amount to distribute: {amount_to_distribute  / (10 ** 12)}")
 
                 async with self.store.lock:
-                    # Get the points of each farmer
-                    points_and_ph: List[Tuple[uint64, bytes32]] = await self.store.get_farmer_points_and_ph()
+                    # Get the points of each farmer, as well as payout instructions. Here a chia address is used,
+                    # but other blockchain addresses can also be used.
+                    points_and_ph: List[
+                        Tuple[uint64, bytes]
+                    ] = await self.store.get_farmer_points_and_payout_instructions()
                     total_points = sum([pt for (pt, ph) in points_and_ph])
                     mojo_per_point = amount_to_distribute / total_points
                     self.log.info(f"Paying out {mojo_per_point} mojo / point")
@@ -420,7 +432,7 @@ class Pool:
                     await asyncio.sleep(30)
 
                 # TODO(pool): persist in DB
-                self.log.info(f"Successfully confirmed payments {transaction}")
+                self.log.info(f"Successfully confirmed payments {payment_targets}")
 
             except asyncio.CancelledError:
                 self.log.info("Cancelled submit_payment_loop, closing")
@@ -550,15 +562,17 @@ class Pool:
                     self.log.info(f"New farmer: {partial.payload.singleton_genesis.hex()}")
                     farmer_record = FarmerRecord(
                         partial.payload.singleton_genesis,
+                        partial.payload.authentication_key_info.authentication_public_key,
+                        partial.payload.authentication_key_info.authentication_public_key_timestamp,
                         partial.payload.owner_public_key,
-                        self.default_pool_puzzle_hash,
+                        self.default_target_puzzle_hash,
                         singleton_state.relative_lock_height,
                         partial.payload.proof_of_space.pool_contract_puzzle_hash,
                         singleton_state.blockchain_height,
                         singleton_state.singleton_coin_id,
                         points_received,
                         partial.payload.suggested_difficulty,
-                        partial.payload.rewards_target,
+                        partial.payload.pool_payout_instructions,
                         True,
                     )
                     self.scan_p2_singleton_puzzle_hashes.add(partial.payload.proof_of_space.pool_contract_puzzle_hash)
@@ -576,19 +590,40 @@ class Pool:
                             new_difficulty = partial.payload.suggested_difficulty
                             self.difficulty_change_time[partial.payload.singleton_genesis] = uint64(int(time.time()))
 
-                    if farmer_record.rewards_target != partial.payload.rewards_target:
-                        self.log.info(f"Farmer changing rewards target to {partial.payload.rewards_target.hex()}")
+                    new_payout_instructions: bytes = farmer_record.pool_payout_instructions
+                    new_authentication_pk: G1Element = farmer_record.authentication_public_key
+                    new_authentication_pk_timestamp: uint64 = farmer_record.authentication_public_key_timestamp
+                    if farmer_record.pool_payout_instructions != partial.payload.pool_payout_instructions:
+                        # Only allow changing payout instructions if we have the latest authentication public key
+                        if (
+                            farmer_record.authentication_public_key_timestamp
+                            <= partial.payload.authentication_key_info.authentication_public_key_timestamp
+                        ):
+                            # This means the authentication key being used is at least as new as the one in the DB
+                            self.log.info(
+                                f"Farmer changing rewards target to {partial.payload.pool_payout_instructions.hex()}"
+                            )
+                            new_payout_instructions = partial.payload.pool_payout_instructions
+                            new_authentication_pk = partial.payload.authentication_key_info.authentication_public_key
+                            new_authentication_pk_timestamp = (
+                                partial.payload.authentication_key_info.authentication_public_key_timestamp
+                            )
+                        else:
+                            # This means the timestamp in DB is new
+                            self.log.info("Not changing pool payout instructions, don't have newest authenticatoin key")
                     farmer_record = FarmerRecord(
                         partial.payload.singleton_genesis,
+                        new_authentication_pk,
+                        new_authentication_pk_timestamp,
                         partial.payload.owner_public_key,
-                        self.default_pool_puzzle_hash,
+                        self.default_target_puzzle_hash,
                         singleton_state.relative_lock_height,
                         partial.payload.proof_of_space.pool_contract_puzzle_hash,
                         singleton_state.blockchain_height,
                         singleton_state.singleton_coin_id,
                         uint64(farmer_record.points + points_received),
                         new_difficulty,
-                        partial.payload.rewards_target,
+                        partial.payload.pool_payout_instructions,
                         True,
                     )
 
@@ -610,7 +645,7 @@ class Pool:
         # update farmer records?
         return SingletonState(
             self.pool_url,
-            self.default_pool_puzzle_hash,
+            self.default_target_puzzle_hash,
             self.relative_lock_height,
             self.min_difficulty,
             False,
@@ -642,10 +677,13 @@ class Pool:
 
         # Validate signatures
         pk1: G1Element = partial.payload.owner_public_key
-        m1: bytes = partial.payload.rewards_target
+        m1: bytes = bytes(partial.payload.authentication_key_info)
         pk2: G1Element = partial.payload.proof_of_space.plot_public_key
         m2: bytes = partial.payload.get_hash()
-        valid_sig = AugSchemeMPL.aggregate_verify([pk1, pk2], [m1, m2], partial.rewards_and_partial_aggregate_signature)
+        pk3: G1Element = partial.payload.authentication_key_info.authentication_public_key
+        valid_sig = AugSchemeMPL.aggregate_verify(
+            [pk1, pk2, pk3], [m1, m2, m2], partial.auth_key_and_partial_aggregate_signature
+        )
 
         if not valid_sig:
             return {

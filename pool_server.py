@@ -64,7 +64,7 @@ class PoolServer:
             "1.0.0",
             str(self.pool.pool_fee),
             "(example) The Reference Pool allows you to pool with low fees, paying out daily using Chia.",
-            self.pool.default_pool_puzzle_hash,
+            self.pool.default_target_puzzle_hash,
         )
         return obj_to_response(res)
 

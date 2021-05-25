@@ -154,11 +154,16 @@ class Pool:
         self.wallet_rpc_client = await WalletRpcClient.create(
             self.config["self_hostname"], uint16(9256), DEFAULT_ROOT_PATH, self.config
         )
-        self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
-        res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
-        self.log.info(f"Logging in: {res}")
-        res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
-        self.log.info(f"Obtaining balance: {res}")
+        while True:
+            try:
+                self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
+                res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
+                self.log.info(f"Logging in: {res}")
+                res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
+                self.log.info(f"Obtaining balance: {res}")
+            except Exception as e:
+                self.log.error(f"{e}, retrying in 30 seconds")
+                await asyncio.sleep(30)
 
         self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
 
@@ -202,6 +207,7 @@ class Pool:
                 return
             except Exception as e:
                 self.log.error(f"Unexpected error in get_peak_loop: {e}")
+                await asyncio.sleep(30)
 
     async def collect_pool_rewards_loop(self):
         """

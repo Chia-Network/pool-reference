@@ -156,16 +156,11 @@ class Pool:
         self.wallet_rpc_client = await WalletRpcClient.create(
             self.config["self_hostname"], uint16(9256), DEFAULT_ROOT_PATH, self.config
         )
-        while True:
-            try:
-                self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
-                res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
-                self.log.info(f"Logging in: {res}")
-                res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
-                self.log.info(f"Obtaining balance: {res}")
-            except Exception as e:
-                self.log.error(f"{e}, retrying in 30 seconds")
-                await asyncio.sleep(30)
+        self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
+        res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
+        self.log.info(f"Logging in: {res}")
+        res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
+        self.log.info(f"Obtaining balance: {res}")
 
         self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
 
@@ -583,6 +578,17 @@ class Pool:
         farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.singleton_genesis)
         if farmer_record is None:
             # TODO(chia-dev)
+            genesis_coin: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
+                partial.payload.singleton_genesis
+            )
+            if genesis_coin is None:
+                self.log.warning(f"Can not find genesis coin {partial.payload.singleton_genesis}")
+                return None
+            if not genesis_coin.spent:
+                self.log.warning(f"Genesis coin {partial.payload.singleton_genesis} not spent")
+                return None
+
+            await self.node_rpc_client.get_additions_and_removals()
             # Get genesis coin record
             # Follow children in block
             singleton_genesis_coin_rec = 0
@@ -627,7 +633,8 @@ class Pool:
                 )
 
         else:
-            # Don't need to update in this case, because there is already another coroutine updating
+            # Don't need to update in this case, because there is already another coroutine updating, so we just
+            # wait for that
             new_singleton_state, _, _ = await singleton_task
 
         return new_singleton_state

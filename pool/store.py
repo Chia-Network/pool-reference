@@ -115,7 +115,7 @@ class PoolStore:
         await self.connection.commit()
 
     async def get_farmer_record(self, singleton_genesis: bytes32) -> Optional[FarmerRecord]:
-        # TODO: use cache
+        # TODO(pool): use cache
         cursor = await self.connection.execute(
             "SELECT * from farmer where singleton_genesis=?",
             (singleton_genesis.hex(),),
@@ -128,6 +128,14 @@ class PoolStore:
     async def update_difficulty(self, singleton_genesis: bytes32, difficulty: uint64):
         cursor = await self.connection.execute(
             f"UPDATE farmer SET difficulty=? WHERE singleton_genesis=?", (difficulty, singleton_genesis.hex())
+        )
+        await cursor.close()
+        await self.connection.commit()
+
+    async def update_singleton(self, singleton_genesis: bytes32, singleton_coin_id: bytes32, is_pool_member: bool):
+        cursor = await self.connection.execute(
+            f"UPDATE farmer SET singleton_coin_id=?, is_pool_member=? WHERE singleton_genesis=?",
+            (singleton_coin_id.hex(), 1 if is_pool_member else 0, singleton_genesis.hex()),
         )
         await cursor.close()
         await self.connection.commit()

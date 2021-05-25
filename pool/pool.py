@@ -3,6 +3,7 @@ import dataclasses
 import logging
 import time
 import traceback
+from asyncio import Task
 from secrets import token_bytes
 from typing import Dict, Optional, Set, List, Tuple
 
@@ -42,6 +43,7 @@ class SingletonState:
 
 class Pool:
     def __init__(self, private_key: PrivateKey, config: Dict, constants: ConsensusConstants):
+        self.follow_singleton_tasks: Dict[bytes32, asyncio.Task] = {}
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
         self.log.basicConfig(level=logging.INFO)
@@ -268,7 +270,6 @@ class Pool:
 
                 for rec in farmer_records:
                     if rec.is_pool_member:
-
                         singleton_coin_record: Optional[
                             CoinRecord
                         ] = await self.node_rpc_client.get_coin_record_by_name(rec.singleton_coin_id)
@@ -520,6 +521,9 @@ class Pool:
                     )
                     self.scan_p2_singleton_puzzle_hashes.add(partial.payload.proof_of_space.pool_contract_puzzle_hash)
                 else:
+                    if not farmer_record.is_pool_member:
+                        # Don't award points to non pool members
+                        return
                     assert partial.payload.owner_public_key == farmer_record.owner_public_key
                     assert (
                         partial.payload.proof_of_space.pool_contract_puzzle_hash
@@ -573,24 +577,60 @@ class Pool:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
 
+    async def get_and_validate_singleton_state_inner(
+        self, partial: SubmitPartial
+    ) -> Optional[Tuple[SingletonState, bool, bool]]:
+        farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.singleton_genesis)
+        if farmer_record is None:
+            # TODO(chia-dev)
+            # Get genesis coin record
+            # Follow children in block
+            singleton_genesis_coin_rec = 0
+
+        # While spent
+        # Get coin additions and removals
+        # follow singleton
+
+        # If assigned to pool returns SingletonState
+        # If same coin Id, return updated False, otherwise True
+        return (
+            SingletonState(
+                self.pool_url,
+                self.default_target_puzzle_hash,
+                self.relative_lock_height,
+                self.min_difficulty,
+                False,
+                0,
+                token_bytes(32),
+            ),
+            False,
+            True,
+        )
+
     async def get_and_validate_singleton_state(self, partial: SubmitPartial) -> Optional[SingletonState]:
         """
         :return: the state of the singleton, if it currently exists in the blockchain, and if it is assigned to
         our pool, with the correct parameters.
         """
+        singleton_task: Optional[Task] = self.follow_singleton_tasks.get(partial.payload.singleton_genesis, None)
+        if singleton_task is None or singleton_task.done():
+            singleton_task = await asyncio.create_task(self.get_and_validate_singleton_state_inner(partial))
+            self.follow_singleton_tasks[partial.payload.singleton_genesis] = singleton_task
+            new_singleton_state, updated, is_pool_member = await singleton_task
+            await self.follow_singleton_tasks.pop(partial.payload.singleton_genesis)
+            if updated:
+                # This means the singleton has been changed in the blockchain (either by us or someone else). We still
+                # keep track of this singleton if the farmer has changed to a different pool, in case they switch back.
+                assert new_singleton_state is not None
+                await self.store.update_singleton(
+                    partial.payload.singleton_genesis, new_singleton_state.singleton_coin_id, is_pool_member
+                )
 
-        # TODO(chia-dev): check if tasks running, if not start one
-        # wait for task to end
-        # update farmer records?
-        return SingletonState(
-            self.pool_url,
-            self.default_target_puzzle_hash,
-            self.relative_lock_height,
-            self.min_difficulty,
-            False,
-            0,
-            token_bytes(32),
-        )
+        else:
+            # Don't need to update in this case, because there is already another coroutine updating
+            new_singleton_state, _, _ = await singleton_task
+
+        return new_singleton_state
 
     async def process_partial(
         self,

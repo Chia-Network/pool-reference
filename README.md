@@ -62,7 +62,8 @@ difficulty or pool payout info. The initial reference client and pool do not use
   
 The 6 hours is used to handle rare cases where a farmer's storage drops dramatically. The 45 minutes is similar, but
 for less extreme cases. Finally, the last case of < 45 minutes should properly handle users with increasing space,
-or slightly decreasing space.
+or slightly decreasing space. This targets 300 partials per day, but different numbers can be used based on
+performance and user preference.
 
 ### Making payments
 Note that the payout info is provided with each partial. The user can choose where rewards are paid out to, and this

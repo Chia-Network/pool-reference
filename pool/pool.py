@@ -28,6 +28,7 @@ from chia.util.lru_cache import LRUCache
 from chia.wallet.puzzles.load_clvm import load_clvm
 from chia.wallet.transaction_record import TransactionRecord
 
+from difficulty_adjustment import get_new_difficulty
 from error_codes import PoolErr
 from store import FarmerRecord, PoolStore
 
@@ -111,10 +112,6 @@ class Pool:
         # reorg. That is why we have a time delay before changing any account points.
         self.partial_confirmation_delay: int = 30
 
-        # Keeps track of when each farmer last changed their difficulty, to rate limit how often they can change it
-        # This helps when the farmer is farming from two machines at the same time (with conflicting difficulties)
-        self.difficulty_change_time: Dict[bytes32, uint64] = {}
-
         # These are the phs that we want to look for on chain, that we can claim to our pool
         self.scan_p2_singleton_puzzle_hashes: Set[bytes32] = set()
 
@@ -142,6 +139,10 @@ class Pool:
 
         # Whether or not the wallet is synced (required to make payments)
         self.wallet_synced = False
+
+        # We target these many partials for this number of seconds. We adjust after receiving this many partials.
+        self.number_of_partials_target: int = 300
+        self.time_target: int = 24 * 3600
 
         # Tasks (infinite While loops) for different purposes
         self.confirm_partials_loop_task: Optional[asyncio.Task] = None
@@ -553,7 +554,6 @@ class Pool:
                 # Don't give rewards while escaping from the pool (is this necessary?)
                 return
 
-            # The farmers sets their own difficulty. We already validated that this is in the correct range.
             async with self.store.lock:
                 farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(
                     partial.payload.singleton_genesis
@@ -582,13 +582,6 @@ class Pool:
                         partial.payload.proof_of_space.pool_contract_puzzle_hash
                         == farmer_record.p2_singleton_puzzle_hash
                     )
-                    new_difficulty: uint64 = farmer_record.difficulty
-                    if partial.payload.suggested_difficulty != farmer_record.difficulty:
-                        if time.time() - self.difficulty_change_time.get(partial.payload.singleton_genesis, 0) > 3600:
-                            # Only change the difficulty about once per hour, to better support multiple devices farming
-                            # on the same pool group
-                            new_difficulty = partial.payload.suggested_difficulty
-                            self.difficulty_change_time[partial.payload.singleton_genesis] = uint64(int(time.time()))
 
                     new_payout_instructions: bytes = farmer_record.pool_payout_instructions
                     new_authentication_pk: G1Element = farmer_record.authentication_public_key
@@ -610,7 +603,7 @@ class Pool:
                             )
                         else:
                             # This means the timestamp in DB is new
-                            self.log.info("Not changing pool payout instructions, don't have newest authenticatoin key")
+                            self.log.info("Not changing pool payout instructions, don't have newest authentication key")
                     farmer_record = FarmerRecord(
                         partial.payload.singleton_genesis,
                         new_authentication_pk,
@@ -622,12 +615,15 @@ class Pool:
                         singleton_state.blockchain_height,
                         singleton_state.singleton_coin_id,
                         uint64(farmer_record.points + points_received),
-                        new_difficulty,
-                        partial.payload.pool_payout_instructions,
+                        farmer_record.difficulty,
+                        new_payout_instructions,
                         True,
                     )
 
                 await self.store.add_farmer_record(farmer_record)
+                await self.store.add_partial(
+                    partial.payload.singleton_genesis, uint64(int(time.time())), points_received
+                )
 
             self.log.info(f"Farmer {partial.payload.owner_public_key} updated points to: " f"{farmer_record.points}")
         except Exception as e:
@@ -666,6 +662,7 @@ class Pool:
         time_received_partial: uint64,
         balance: uint64,
         current_difficulty: uint64,
+        can_update_difficulty: bool,
     ) -> Dict:
         if partial.payload.suggested_difficulty < self.min_difficulty:
             return {
@@ -750,5 +747,36 @@ class Pool:
             }
 
         await self.pending_point_partials.put((partial, time_received_partial, current_difficulty))
+
+        if can_update_difficulty:
+            async with self.store.lock:
+                # Obtains the new record in case we just updated difficulty
+                farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(
+                    partial.payload.singleton_genesis
+                )
+                if farmer_record is not None:
+                    current_difficulty = farmer_record.difficulty
+                    # Decide whether to update the difficulty
+                    recent_partials = await self.store.get_recent_partials(
+                        partial.payload.singleton_genesis, self.number_of_partials_target
+                    )
+                    # Only update the difficulty if we meet certain conditions
+                    new_difficulty: uint64 = get_new_difficulty(
+                        recent_partials,
+                        self.number_of_partials_target,
+                        self.time_target,
+                        current_difficulty,
+                        time_received_partial,
+                        self.min_difficulty,
+                    )
+
+                    # Only allow changing difficulty if we have the latest authentication public key
+                    if (
+                        current_difficulty != new_difficulty
+                        and farmer_record.authentication_public_key_timestamp
+                        <= partial.payload.authentication_key_info.authentication_public_key_timestamp
+                    ):
+                        await self.store.update_difficulty(partial.payload.singleton_genesis, new_difficulty)
+                        return {"points_balance": balance, "current_difficulty": new_difficulty}
 
         return {"points_balance": balance, "current_difficulty": current_difficulty}

@@ -8,7 +8,6 @@ from blspy import G1Element
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.ints import uint32, uint64
 
-from chia.util.lru_cache import LRUCache
 from chia.util.streamable import streamable, Streamable
 
 
@@ -37,7 +36,7 @@ class PoolStore:
     @classmethod
     async def create(cls):
         self = cls()
-        self.db_path = Path("pooldb.sqlite")
+        self.db_path = Path("../pooldb.sqlite")
         self.connection = await aiosqlite.connect(self.db_path)
         self.lock = asyncio.Lock()
         await self.connection.execute("pragma journal_mode=wal")
@@ -61,8 +60,15 @@ class PoolStore:
             )
         )
 
-        # Useful for reorg lookups
+        await self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS partial(singleton_genesis text, timestamp bigint, difficulty bigint)"
+        )
+
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
+        await self.connection.execute(
+            "CREATE INDEX IF NOT EXISTS singleton_genesis_index on partial(singleton_genesis)"
+        )
 
         await self.connection.commit()
 
@@ -119,6 +125,13 @@ class PoolStore:
             return None
         return self._row_to_farmer_record(row)
 
+    async def update_difficulty(self, singleton_genesis: bytes32, difficulty: uint64):
+        cursor = await self.connection.execute(
+            f"UPDATE farmer set difficulty=? WHERE singleton_genesis=?", (difficulty, singleton_genesis)
+        )
+        await cursor.close()
+        await self.connection.commit()
+
     async def get_pay_to_singleton_phs(self) -> Set[bytes32]:
         cursor = await self.connection.execute("SELECT p2_singleton_puzzle_hash from farmer")
         rows = await cursor.fetchall()
@@ -158,4 +171,23 @@ class PoolStore:
 
     async def clear_farmer_points(self) -> None:
         cursor = await self.connection.execute(f"UPDATE farmer set points=0")
-        await cursor.fetchall()
+        await cursor.close()
+        await self.connection.commit()
+
+    async def add_partial(self, singleton_genesis: bytes32, timestamp: uint64, difficulty: uint64):
+        cursor = await self.connection.execute(
+            "INSERT into partial VALUES(?, ?, ?)",
+            (singleton_genesis.hex(), timestamp, difficulty),
+        )
+        await cursor.close()
+        await self.connection.commit()
+
+    async def get_recent_partials(self, singleton_genesis: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
+        print(count, singleton_genesis.hex())
+        cursor = await self.connection.execute(
+            "SELECT timestamp, difficulty from partial WHERE singleton_genesis=? ORDER BY timestamp DESC LIMIT ?",
+            (singleton_genesis.hex(), count),
+        )
+        rows = await cursor.fetchall()
+        ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]
+        return ret

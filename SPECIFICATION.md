@@ -215,3 +215,19 @@ INVALID_P2_SINGLETON_PUZZLE_HASH = 9
 ```
 
 ## Security considerations
+TODO
+
+## Singletons
+### Pay to singleton puzzle
+TODO
+### Singleton genesis
+TODO
+
+### Singleton outer layer
+TODO
+
+### Singleton escaping
+TODO
+
+### Singleton 
+TODO

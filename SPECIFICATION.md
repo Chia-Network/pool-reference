@@ -193,13 +193,20 @@ Note that the coinbase rewards in Chia are divided into two coins: the farmer co
 The user transaction fees on the blockchain are included in the farmer coin as well. This split of 7/8 1/8 exists
 to prevent attacks where one pool tries to destroy another by farming partials, but never submitting winning blocks.
 
-
 ## Difficulty
 The difficulty allows the pool operator to control how many partials per day they are receiving from each farmer.
-A difficulty of 1 results in approximately 10 partials per day per k32 plot. This is the minimum difficulty that 
-the V1 of the protocol supports is 1. However, a pool may set a higher minimum difficulty for efficiency. When 
-calculating whether a proof is high quality enough for being awarded points, the pool should use 
+A difficulty of 1 results in approximately 10 partials per day per k32 plot. This is the minimum difficulty that
+the V1 of the protocol supports is 1. However, a pool may set a higher minimum difficulty for efficiency. When
+calculating whether a proof is high quality enough for being awarded points, the pool should use
 `sub_slot_iters=37600000000`.
+
+## Points
+X points are awarded for submitting a partial with difficulty X, which means that points scale linearly with difficulty.
+For example, 100 TiB of space should yield approximately 10,000 points per day, whether the difficulty is set to
+100 or 200. It should not matter what difficulty is set for a farmer, as long as they are consistently submitting partials.
+The specification does not require pools to pay out proportionally by points, but the payout scheme should be clear to
+farmers, and points should be acknowledged and accumulated points returned in the response.
+
 
 ## Error codes
 ```

@@ -466,6 +466,8 @@ class Pool:
 
     async def check_and_confirm_partial(self, partial: SubmitPartial, points_received: uint64) -> None:
         try:
+            # TODO(pool): these lookups to the full node are not efficient and can be cached, especially for
+            #  scaling to many users
             if partial.payload.end_of_sub_slot:
                 response = await self.node_rpc_client.get_recent_signage_point_or_eos(None, partial.payload.sp_hash)
                 if response is None or response["reverted"]:

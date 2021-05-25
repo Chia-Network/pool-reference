@@ -13,6 +13,17 @@ Several things are customizable in this pool reference. This includes:
 However, some things cannot be changed. These are described in SPECIFICATION.md, and mostly relate to validation,
 protocol, and the singleton format for smart coins. 
 
+### Receiving partials
+A partial is a proof of space with some additional metadata and authentication info from the farmer, which
+meets certain minimum difficulty requirements. Partials must be real proofs of space responding to blockchain signage
+points, and they must be submitted within the blockchain time window (28 seconds after the signage point).
+
+The pool server works by receiving partials from the users, validating that they are correct and correspond to a valid
+signage point on the blockchain, and then adding them to a queue. A few minutes later, the pool pulls from the
+queue, and checks that the signage point for that partial is still in the blockchain. If everything is good, the
+partial is counted as valid, and the points are added for that farmer.
+
+
 ### Collecting pool rewards
 ![Pool absorbing rewards image](images/absorb.png?raw=true "Absorbing rewards")
 

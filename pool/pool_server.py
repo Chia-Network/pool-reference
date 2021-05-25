@@ -83,7 +83,6 @@ class PoolServer:
         )
         if farmer_record is not None:
             current_difficulty: uint64 = farmer_record.difficulty
-            self.pool.log.info(f"Curr dif: {current_difficulty}")
             balance = farmer_record.points
         else:
             current_difficulty = self.pool.default_difficulty

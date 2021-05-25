@@ -183,7 +183,6 @@ class PoolStore:
         await self.connection.commit()
 
     async def get_recent_partials(self, singleton_genesis: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
-        print(count, singleton_genesis.hex())
         cursor = await self.connection.execute(
             "SELECT timestamp, difficulty from partial WHERE singleton_genesis=? ORDER BY timestamp DESC LIMIT ?",
             (singleton_genesis.hex(), count),

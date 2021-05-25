@@ -6,15 +6,11 @@ import traceback
 from secrets import token_bytes
 from typing import Dict, Optional, Set, List, Tuple
 
-from blspy import AugSchemeMPL, PrivateKey, G1Element, G2Element
-from chia.consensus.coinbase import pool_parent_id
+from blspy import AugSchemeMPL, PrivateKey, G1Element
 from chia.protocols.pool_protocol import SubmitPartial
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
-from chia.types.blockchain_format.program import Program, INFINITE_COST, SerializedProgram
 from chia.types.coin_record import CoinRecord
-from chia.types.coin_solution import CoinSolution
-from chia.types.spend_bundle import SpendBundle
 from chia.util.bech32m import decode_puzzle_hash
 from chia.consensus.constants import ConsensusConstants
 from chia.util.ints import uint64, uint16, uint32
@@ -23,21 +19,14 @@ from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.full_node.signage_point import SignagePoint
 from chia.types.end_of_slot_bundle import EndOfSubSlotBundle
 from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.consensus.pot_iterations import calculate_iterations_quality, calculate_sp_interval_iters
+from chia.consensus.pot_iterations import calculate_iterations_quality
 from chia.util.lru_cache import LRUCache
-from chia.wallet.puzzles.load_clvm import load_clvm
 from chia.wallet.transaction_record import TransactionRecord
 
 from difficulty_adjustment import get_new_difficulty
 from error_codes import PoolErr
 from store import FarmerRecord, PoolStore
-
-
-SINGLETON_MOD = load_clvm("singleton_top_layer.clvm")
-P2_SINGLETON_MOD = load_clvm("p2_singleton.clvm")
-POOL_COMMITED_MOD = load_clvm("pool_member_innerpuz.clvm")
-POOL_ESCAPING_MOD = load_clvm("pool_escaping_innerpuz.clvm")
-singleton_mod_hash = SINGLETON_MOD.get_tree_hash()
+from singleton import create_absorb_transaction, calculate_p2_singleton_ph
 
 
 @dataclasses.dataclass
@@ -141,8 +130,8 @@ class Pool:
         self.wallet_synced = False
 
         # We target these many partials for this number of seconds. We adjust after receiving this many partials.
-        self.number_of_partials_target: int = 300
-        self.time_target: int = 24 * 3600
+        self.number_of_partials_target: int = 30
+        self.time_target: int = 24 * 360
 
         # Tasks (infinite While loops) for different purposes
         self.confirm_partials_loop_task: Optional[asyncio.Task] = None
@@ -284,8 +273,12 @@ class Pool:
                             self.log.warning(f"Singleton coin {rec.singleton_coin_id} is spent")
                             continue
 
-                        spend_bundle = await self.create_absorb_transaction(
-                            rec, singleton_coin_record.coin, ph_to_coins[rec.p2_singleton_puzzle_hash]
+                        spend_bundle = await create_absorb_transaction(
+                            rec,
+                            singleton_coin_record.coin,
+                            ph_to_coins[rec.p2_singleton_puzzle_hash],
+                            self.relative_lock_height,
+                            self.constants.GENESIS_CHALLENGE,
                         )
 
                         push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
@@ -443,64 +436,6 @@ class Pool:
                 self.log.error(f"Unexpected error in submit_payment_loop: {e}")
                 await asyncio.sleep(60)
 
-    async def get_next_singleton_coin(self, spend_bundle: SpendBundle) -> Coin:
-        # TODO(chia-dev): implement
-        pass
-
-    async def create_absorb_transaction(
-        self, farmer_record: FarmerRecord, singleton_coin: Coin, reward_coin_records: List[CoinRecord]
-    ) -> SpendBundle:
-        # We assume that the farmer record singleton state is updated to the latest
-        escape_inner_puzzle: Program = POOL_ESCAPING_MOD.curry(
-            farmer_record.pool_puzzle_hash,
-            self.relative_lock_height,
-            bytes(farmer_record.owner_public_key),
-            farmer_record.p2_singleton_puzzle_hash,
-        )
-        committed_inner_puzzle: Program = POOL_COMMITED_MOD.curry(
-            farmer_record.pool_puzzle_hash,
-            escape_inner_puzzle.get_tree_hash(),
-            farmer_record.p2_singleton_puzzle_hash,
-            bytes(farmer_record.owner_public_key),
-        )
-
-        aggregate_spend_bundle: SpendBundle = SpendBundle([], G2Element())
-        for reward_coin_record in reward_coin_records:
-            found_block_index: Optional[uint32] = None
-            for block_index in range(
-                reward_coin_record.confirmed_block_index, reward_coin_record.confirmed_block_index - 100, -1
-            ):
-                if block_index < 0:
-                    break
-                pool_parent = pool_parent_id(uint32(block_index), self.constants.GENESIS_CHALLENGE)
-                if pool_parent == reward_coin_record.coin.parent_coin_info:
-                    found_block_index = uint32(block_index)
-            if not found_block_index:
-                self.log.info(f"Received reward {reward_coin_record.coin} that is not a pool reward.")
-
-            singleton_full = SINGLETON_MOD.curry(
-                singleton_mod_hash, farmer_record.singleton_genesis, committed_inner_puzzle
-            )
-
-            inner_sol = Program.to(
-                [0, singleton_full.get_tree_hash(), singleton_coin.amount, reward_coin_record.amount, found_block_index]
-            )
-            full_sol = Program.to([farmer_record.singleton_genesis, singleton_coin.amount, inner_sol])
-
-            new_spend = SpendBundle(
-                [CoinSolution(singleton_coin, SerializedProgram.from_bytes(bytes(singleton_full)), full_sol)],
-                G2Element(),
-            )
-            # TODO(pool): handle the case where the cost exceeds the size of the block
-            aggregate_spend_bundle = SpendBundle.aggregate([aggregate_spend_bundle, new_spend])
-
-            singleton_coin = await self.get_next_singleton_coin(new_spend)
-
-            cost, result = singleton_full.run_with_cost(INFINITE_COST, full_sol)
-            self.log.info(f"Cost: {cost}, result {result}")
-
-        return aggregate_spend_bundle
-
     async def confirm_partials_loop(self):
         """
         Pulls things from the queue of partials one at a time, and adjusts balances.
@@ -649,13 +584,6 @@ class Pool:
             token_bytes(32),
         )
 
-    @staticmethod
-    async def calculate_p2_singleton_ph(partial: SubmitPartial) -> bytes32:
-        p2_singleton_full = P2_SINGLETON_MOD.curry(
-            singleton_mod_hash, Program.to(singleton_mod_hash).get_tree_hash(), partial.payload.singleton_genesis
-        )
-        return p2_singleton_full.get_tree_hash()
-
     async def process_partial(
         self,
         partial: SubmitPartial,
@@ -686,7 +614,7 @@ class Pool:
                 "error_message": f"The aggregate signature is invalid {partial.rewards_and_partial_aggregate_signature}",
             }
 
-        if partial.payload.proof_of_space.pool_contract_puzzle_hash != await self.calculate_p2_singleton_ph(partial):
+        if partial.payload.proof_of_space.pool_contract_puzzle_hash != await calculate_p2_singleton_ph(partial):
             return {
                 "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
                 "error_message": f"The puzzl h {partial.rewards_and_partial_aggregate_signature}",

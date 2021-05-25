@@ -36,7 +36,7 @@ class PoolStore:
     @classmethod
     async def create(cls):
         self = cls()
-        self.db_path = Path("../pooldb.sqlite")
+        self.db_path = Path("pooldb.sqlite")
         self.connection = await aiosqlite.connect(self.db_path)
         self.lock = asyncio.Lock()
         await self.connection.execute("pragma journal_mode=wal")
@@ -127,7 +127,7 @@ class PoolStore:
 
     async def update_difficulty(self, singleton_genesis: bytes32, difficulty: uint64):
         cursor = await self.connection.execute(
-            f"UPDATE farmer set difficulty=? WHERE singleton_genesis=?", (difficulty, singleton_genesis)
+            f"UPDATE farmer SET difficulty=? WHERE singleton_genesis=?", (difficulty, singleton_genesis.hex())
         )
         await cursor.close()
         await self.connection.commit()

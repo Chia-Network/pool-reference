@@ -3,3 +3,4 @@ blspy~=1.0.2
 setuptools~=56.1.0
 aiosqlite~=0.17.0
 aiohttp~=3.7.4
+pytest==6.2.4

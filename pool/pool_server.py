@@ -64,7 +64,7 @@ class PoolServer:
             "1.0.0",
             str(self.pool.pool_fee),
             "(example) The Reference Pool allows you to pool with low fees, paying out daily using Chia.",
-            self.pool.default_pool_puzzle_hash,
+            self.pool.default_target_puzzle_hash,
         )
         return obj_to_response(res)
 
@@ -82,10 +82,10 @@ class PoolServer:
             partial.payload.singleton_genesis
         )
         if farmer_record is not None:
-            curr_difficulty: uint64 = farmer_record.difficulty
+            current_difficulty: uint64 = farmer_record.difficulty
             balance = farmer_record.points
         else:
-            curr_difficulty = self.pool.default_difficulty
+            current_difficulty = self.pool.default_difficulty
             balance = uint64(0)
 
         async def await_and_call(cor, *args):
@@ -94,16 +94,13 @@ class PoolServer:
             res = await cor(args)
             self.pool.log.info(f"Delayed response: {res}")
 
-        res_dict = await self.pool.process_partial(
-            partial,
-            time_received_partial,
-            balance,
-            curr_difficulty,
-        )
+        res_dict = await self.pool.process_partial(partial, time_received_partial, balance, current_difficulty, True)
 
         if "error_code" in res_dict and "error_code" == PoolErr.NOT_FOUND.value:
             asyncio.create_task(
-                await_and_call(self.pool.process_partial, partial, time_received_partial, balance, curr_difficulty)
+                await_and_call(
+                    self.pool.process_partial, partial, time_received_partial, balance, current_difficulty, False
+                )
             )
 
         self.pool.log.info(

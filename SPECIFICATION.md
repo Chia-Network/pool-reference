@@ -52,7 +52,7 @@ The description is a short paragraph that can be displayed in GUIs when the farm
 The fee that the pool charges by default, a number between 0 and 1. This assume
 
 #### logo_url
-A URL for a pool logo that the client can display in the UI.
+A URL for a pool logo that the client can display in the UI. This is optional for v1.0.
 
 #### minimum_difficulty
 The minimum difficulty that the pool supports. This will also be the default that farmers start sending proofs for.

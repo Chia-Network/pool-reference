@@ -31,11 +31,6 @@ async def calculate_p2_singleton_ph(partial: SubmitPartial) -> bytes32:
     return p2_singleton_full.get_tree_hash()
 
 
-async def get_next_singleton_coin(spend_bundle: SpendBundle) -> Coin:
-    # TODO(chia-dev): implement
-    pass
-
-
 async def create_absorb_transaction(
     farmer_record: FarmerRecord,
     singleton_coin: Coin,
@@ -69,7 +64,9 @@ async def create_absorb_transaction(
             if pool_parent == reward_coin_record.coin.parent_coin_info:
                 found_block_index = uint32(block_index)
         if not found_block_index:
+            # The puzzle does not allow spending coins that are not a coinbase reward
             log.info(f"Received reward {reward_coin_record.coin} that is not a pool reward.")
+            continue
 
         singleton_full = SINGLETON_MOD.curry(
             singleton_mod_hash, farmer_record.singleton_genesis, committed_inner_puzzle
@@ -87,7 +84,8 @@ async def create_absorb_transaction(
         # TODO(pool): handle the case where the cost exceeds the size of the block
         aggregate_spend_bundle = SpendBundle.aggregate([aggregate_spend_bundle, new_spend])
 
-        singleton_coin = await get_next_singleton_coin(new_spend)
+        # The new singleton will have the same puzzle hash and amount, but just have a different parent (old singleton)
+        singleton_coin = Coin(singleton_coin.name(), singleton_coin.puzzle_hash(), singleton_coin.amount)
 
         cost, result = singleton_full.run_with_cost(INFINITE_COST, full_sol)
         log.info(f"Cost: {cost}, result {result}")

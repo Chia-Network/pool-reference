@@ -1,6 +1,6 @@
 # Chia Pool Protocol 1.0
 
-This is the initial version of the Chia Pool Protocol. It has been designed to be simple, and extensible in the future.
+This is the initial version of the Chia Pool Protocol. It has been designed to be simple, and to be extended later.
 It relies on farmers having smart coins (referred to as Pool NFT in GUI + CLI) on the blockchain which allow them to dynamically set their pool to a different
 pool by making a blockchain transaction. Furthermore, it decreases the reliance on pools for block production, since
 the protocol only handles distribution of rewards, and it protects against pools or farmers acting maliciously.
@@ -14,10 +14,11 @@ to run a full node, they can configure their node to connect to a remote full no
 
 A pool operator can support any number of farmers. 
 
-## HTTP Endpoints Summary
+## HTTPS Endpoints Summary
 
-The pool protocol consists of two HTTP endpoints which return JSON responses. The HTTP server can run on any port,
-but must be running with TLS enabled. All bytes values are encoded as hex with optional 0x in front.
+The pool protocol consists of two HTTPS endpoints which return JSON responses. The HTTPS server can run on any port,
+but must be running with TLS enabled (using a CA approved certificate), and with pipelining enabled. 
+All bytes values are encoded as hex with optional 0x in front. Clients are also expected to run with pipelining.
 
 ```
 GET /pool_info
@@ -49,7 +50,7 @@ scripts and JS injections. It returns a JSON response with the following data:
 The description is a short paragraph that can be displayed in GUIs when the farmer enters a pool URL.
 
 #### fee
-The fee that the pool charges by default, a number between 0 and 1. This assume
+The fee that the pool charges by default, a number between 0 and 1. This does not include blockchain transaction fees.
 
 #### logo_url
 A URL for a pool logo that the client can display in the UI. This is optional for v1.0.
@@ -195,6 +196,8 @@ to prevent attacks where one pool tries to destroy another by farming partials, 
 
 ## Difficulty
 The difficulty allows the pool operator to control how many partials per day they are receiving from each farmer.
+The difficulty can be adjusted separately for each farmer. A reasonable target would be 300 partials per day,
+to ensure frequent feedback to the farmer, and low variability.
 A difficulty of 1 results in approximately 10 partials per day per k32 plot. This is the minimum difficulty that
 the V1 of the protocol supports is 1. However, a pool may set a higher minimum difficulty for efficiency. When
 calculating whether a proof is high quality enough for being awarded points, the pool should use
@@ -222,7 +225,8 @@ INVALID_P2_SINGLETON_PUZZLE_HASH = 9
 ```
 
 ## Security considerations
-TODO
+The pool must ensure that partials arrive quickly, faster than the 28 second time limit of inclusion into the
+blockchain. This allows farmers that have slow setups to detect issues.
 
 ## Singletons
 ### Pay to singleton puzzle

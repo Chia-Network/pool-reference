@@ -129,8 +129,8 @@ async def start_pool_server():
     app.add_routes(
         [
             web.get("/", server.wrap_http_handler(server.index)),
-            web.get("/get_pool_info", server.wrap_http_handler(server.get_pool_info)),
-            web.post("/submit_partial", server.wrap_http_handler(server.submit_partial)),
+            web.get("/pool_info", server.wrap_http_handler(server.get_pool_info)),
+            web.post("/partial", server.wrap_http_handler(server.submit_partial)),
         ]
     )
     runner = aiohttp.web.AppRunner(app, access_log=None)

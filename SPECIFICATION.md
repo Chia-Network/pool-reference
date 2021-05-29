@@ -74,7 +74,7 @@ point at which they can finalize their pool switch.
 This is the target of where rewards will be sent to from the singleton. Controlled by the pool.
 
 ## POST /partials
-This is a partial submittion from the farmer to the pool operator.
+This is a partial submission from the farmer to the pool operator.
 
 Request:
 ```json

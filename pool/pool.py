@@ -495,12 +495,12 @@ class Pool:
 
             async with self.store.lock:
                 farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(
-                    partial.payload.singleton_genesis
+                    partial.payload.launcher_id
                 )
                 if farmer_record is None:
-                    self.log.info(f"New farmer: {partial.payload.singleton_genesis.hex()}")
+                    self.log.info(f"New farmer: {partial.payload.launcher_id.hex()}")
                     farmer_record = FarmerRecord(
-                        partial.payload.singleton_genesis,
+                        partial.payload.launcher_id,
                         partial.payload.authentication_key_info.authentication_public_key,
                         partial.payload.authentication_key_info.authentication_public_key_timestamp,
                         partial.payload.owner_public_key,
@@ -547,7 +547,7 @@ class Pool:
                             # This means the timestamp in DB is new
                             self.log.info("Not changing pool payout instructions, don't have newest authentication key")
                     farmer_record = FarmerRecord(
-                        partial.payload.singleton_genesis,
+                        partial.payload.launcher_id,
                         new_authentication_pk,
                         new_authentication_pk_timestamp,
                         partial.payload.owner_public_key,
@@ -564,7 +564,7 @@ class Pool:
 
                 await self.store.add_farmer_record(farmer_record)
                 await self.store.add_partial(
-                    partial.payload.singleton_genesis, uint64(int(time.time())), points_received
+                    partial.payload.launcher_id, uint64(int(time.time())), points_received
                 )
 
             self.log.info(f"Farmer {partial.payload.owner_public_key} updated points to: " f"{farmer_record.points}")
@@ -575,23 +575,23 @@ class Pool:
     async def get_and_validate_singleton_state_inner(
         self, partial: SubmitPartial
     ) -> Optional[Tuple[SingletonState, bool, bool]]:
-        farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.singleton_genesis)
+        farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.launcher_id)
         if farmer_record is None:
             # TODO(chia-dev)
             genesis_coin: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
-                partial.payload.singleton_genesis
+                partial.payload.launcher_id
             )
             if genesis_coin is None:
-                self.log.warning(f"Can not find genesis coin {partial.payload.singleton_genesis}")
+                self.log.warning(f"Can not find genesis coin {partial.payload.launcher_id}")
                 return None
             if not genesis_coin.spent:
-                self.log.warning(f"Genesis coin {partial.payload.singleton_genesis} not spent")
+                self.log.warning(f"Genesis coin {partial.payload.launcher_id} not spent")
                 return None
 
             await self.node_rpc_client.get_additions_and_removals()
             # Get genesis coin record
             # Follow children in block
-            singleton_genesis_coin_rec = 0
+            launcher_id_coin_rec = 0
 
         # While spent
         # Get coin additions and removals
@@ -618,18 +618,18 @@ class Pool:
         :return: the state of the singleton, if it currently exists in the blockchain, and if it is assigned to
         our pool, with the correct parameters.
         """
-        singleton_task: Optional[Task] = self.follow_singleton_tasks.get(partial.payload.singleton_genesis, None)
+        singleton_task: Optional[Task] = self.follow_singleton_tasks.get(partial.payload.launcher_id, None)
         if singleton_task is None or singleton_task.done():
             singleton_task = await asyncio.create_task(self.get_and_validate_singleton_state_inner(partial))
-            self.follow_singleton_tasks[partial.payload.singleton_genesis] = singleton_task
+            self.follow_singleton_tasks[partial.payload.launcher_id] = singleton_task
             new_singleton_state, updated, is_pool_member = await singleton_task
-            await self.follow_singleton_tasks.pop(partial.payload.singleton_genesis)
+            await self.follow_singleton_tasks.pop(partial.payload.launcher_id)
             if updated:
                 # This means the singleton has been changed in the blockchain (either by us or someone else). We still
                 # keep track of this singleton if the farmer has changed to a different pool, in case they switch back.
                 assert new_singleton_state is not None
                 await self.store.update_singleton(
-                    partial.payload.singleton_genesis, new_singleton_state.singleton_coin_id, is_pool_member
+                    partial.payload.launcher_id, new_singleton_state.singleton_coin_id, is_pool_member
                 )
 
         else:
@@ -735,13 +735,13 @@ class Pool:
             async with self.store.lock:
                 # Obtains the new record in case we just updated difficulty
                 farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(
-                    partial.payload.singleton_genesis
+                    partial.payload.launcher_id
                 )
                 if farmer_record is not None:
                     current_difficulty = farmer_record.difficulty
                     # Decide whether to update the difficulty
                     recent_partials = await self.store.get_recent_partials(
-                        partial.payload.singleton_genesis, self.number_of_partials_target
+                        partial.payload.launcher_id, self.number_of_partials_target
                     )
                     # Only update the difficulty if we meet certain conditions
                     new_difficulty: uint64 = get_new_difficulty(
@@ -759,7 +759,7 @@ class Pool:
                         and farmer_record.authentication_public_key_timestamp
                         <= partial.payload.authentication_key_info.authentication_public_key_timestamp
                     ):
-                        await self.store.update_difficulty(partial.payload.singleton_genesis, new_difficulty)
+                        await self.store.update_difficulty(partial.payload.launcher_id, new_difficulty)
                         return {"points_balance": balance, "current_difficulty": new_difficulty}
 
         return {"points_balance": balance, "current_difficulty": current_difficulty}

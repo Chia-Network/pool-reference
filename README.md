@@ -68,7 +68,7 @@ performance and user preference.
 ### Making payments
 Note that the payout info is provided with each partial. The user can choose where rewards are paid out to, and this
 does not have to be an XCH address. The pool should ONLY update the payout info for successful partials with the
-latest seen authentication key for that singleton_genesis.
+latest seen authentication key for that launcher_id.
 
 
 ### Start the server

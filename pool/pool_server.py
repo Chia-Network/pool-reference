@@ -79,7 +79,7 @@ class PoolServer:
         # difficulty requires a few minutes, otherwise farmers can abuse by setting the difficulty right under the
         # proof that they found.
         farmer_record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(
-            partial.payload.singleton_genesis
+            partial.payload.launcher_id
         )
         if farmer_record is not None:
             current_difficulty: uint64 = farmer_record.difficulty
@@ -105,7 +105,7 @@ class PoolServer:
 
         self.pool.log.info(
             f"Returning {res_dict}, time: {time.time() - start_time} "
-            f"singleton: {request['payload']['singleton_genesis']}"
+            f"singleton: {request['payload']['launcher_id']}"
         )
         return obj_to_response(res_dict)
 

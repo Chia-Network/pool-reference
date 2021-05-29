@@ -26,7 +26,7 @@ log.basicConfig(level=logging.INFO)
 
 async def calculate_p2_singleton_ph(partial: SubmitPartial) -> bytes32:
     p2_singleton_full = P2_SINGLETON_MOD.curry(
-        singleton_mod_hash, Program.to(singleton_mod_hash).get_tree_hash(), partial.payload.singleton_genesis
+        singleton_mod_hash, Program.to(singleton_mod_hash).get_tree_hash(), partial.payload.launcher_id
     )
     return p2_singleton_full.get_tree_hash()
 
@@ -69,13 +69,13 @@ async def create_absorb_transaction(
             continue
 
         singleton_full = SINGLETON_MOD.curry(
-            singleton_mod_hash, farmer_record.singleton_genesis, committed_inner_puzzle
+            singleton_mod_hash, farmer_record.launcher_id, committed_inner_puzzle
         )
 
         inner_sol = Program.to(
             [0, singleton_full.get_tree_hash(), singleton_coin.amount, reward_coin_record.amount, found_block_index]
         )
-        full_sol = Program.to([farmer_record.singleton_genesis, singleton_coin.amount, inner_sol])
+        full_sol = Program.to([farmer_record.launcher_id, singleton_coin.amount, inner_sol])
 
         new_spend = SpendBundle(
             [CoinSolution(singleton_coin, SerializedProgram.from_bytes(bytes(singleton_full)), full_sol)],

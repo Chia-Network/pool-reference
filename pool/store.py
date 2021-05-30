@@ -14,7 +14,7 @@ from chia.util.streamable import streamable, Streamable
 @dataclass(frozen=True)
 @streamable
 class FarmerRecord(Streamable):
-    singleton_genesis: bytes32  # This uniquely identifies the singleton on the blockchain (ID for this farmer)
+    launcher_id: bytes32  # This uniquely identifies the singleton on the blockchain (ID for this farmer)
     authentication_public_key: G1Element  # This is the latest public key of the farmer (signs all partials)
     authentication_public_key_timestamp: uint64  # The timestamp of approval of the latest public key, by the owner key
     owner_public_key: G1Element  # The public key of the owner of the singleton, must be on the blockchain
@@ -44,7 +44,7 @@ class PoolStore:
         await self.connection.execute(
             (
                 "CREATE TABLE IF NOT EXISTS farmer("
-                "singleton_genesis text PRIMARY KEY,"
+                "launcher_id text PRIMARY KEY,"
                 " authentication_public_key text,"
                 " authentication_public_key_timestamp bigint,"
                 " owner_public_key text,"
@@ -61,13 +61,13 @@ class PoolStore:
         )
 
         await self.connection.execute(
-            "CREATE TABLE IF NOT EXISTS partial(singleton_genesis text, timestamp bigint, difficulty bigint)"
+            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, timestamp bigint, difficulty bigint)"
         )
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
         await self.connection.execute(
-            "CREATE INDEX IF NOT EXISTS singleton_genesis_index on partial(singleton_genesis)"
+            "CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)"
         )
 
         await self.connection.commit()
@@ -96,7 +96,7 @@ class PoolStore:
         cursor = await self.connection.execute(
             f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                farmer_record.singleton_genesis.hex(),
+                farmer_record.launcher_id.hex(),
                 bytes(farmer_record.authentication_public_key).hex(),
                 farmer_record.authentication_public_key_timestamp,
                 bytes(farmer_record.owner_public_key).hex(),
@@ -114,28 +114,28 @@ class PoolStore:
         await cursor.close()
         await self.connection.commit()
 
-    async def get_farmer_record(self, singleton_genesis: bytes32) -> Optional[FarmerRecord]:
+    async def get_farmer_record(self, launcher_id: bytes32) -> Optional[FarmerRecord]:
         # TODO(pool): use cache
         cursor = await self.connection.execute(
-            "SELECT * from farmer where singleton_genesis=?",
-            (singleton_genesis.hex(),),
+            "SELECT * from farmer where launcher_id=?",
+            (launcher_id.hex(),),
         )
         row = await cursor.fetchone()
         if row is None:
             return None
         return self._row_to_farmer_record(row)
 
-    async def update_difficulty(self, singleton_genesis: bytes32, difficulty: uint64):
+    async def update_difficulty(self, launcher_id: bytes32, difficulty: uint64):
         cursor = await self.connection.execute(
-            f"UPDATE farmer SET difficulty=? WHERE singleton_genesis=?", (difficulty, singleton_genesis.hex())
+            f"UPDATE farmer SET difficulty=? WHERE launcher_id=?", (difficulty, launcher_id.hex())
         )
         await cursor.close()
         await self.connection.commit()
 
-    async def update_singleton(self, singleton_genesis: bytes32, singleton_coin_id: bytes32, is_pool_member: bool):
+    async def update_singleton(self, launcher_id: bytes32, singleton_coin_id: bytes32, is_pool_member: bool):
         cursor = await self.connection.execute(
-            f"UPDATE farmer SET singleton_coin_id=?, is_pool_member=? WHERE singleton_genesis=?",
-            (singleton_coin_id.hex(), 1 if is_pool_member else 0, singleton_genesis.hex()),
+            f"UPDATE farmer SET singleton_coin_id=?, is_pool_member=? WHERE launcher_id=?",
+            (singleton_coin_id.hex(), 1 if is_pool_member else 0, launcher_id.hex()),
         )
         await cursor.close()
         await self.connection.commit()
@@ -182,18 +182,18 @@ class PoolStore:
         await cursor.close()
         await self.connection.commit()
 
-    async def add_partial(self, singleton_genesis: bytes32, timestamp: uint64, difficulty: uint64):
+    async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
         cursor = await self.connection.execute(
             "INSERT into partial VALUES(?, ?, ?)",
-            (singleton_genesis.hex(), timestamp, difficulty),
+            (launcher_id.hex(), timestamp, difficulty),
         )
         await cursor.close()
         await self.connection.commit()
 
-    async def get_recent_partials(self, singleton_genesis: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
+    async def get_recent_partials(self, launcher_id: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
         cursor = await self.connection.execute(
-            "SELECT timestamp, difficulty from partial WHERE singleton_genesis=? ORDER BY timestamp DESC LIMIT ?",
-            (singleton_genesis.hex(), count),
+            "SELECT timestamp, difficulty from partial WHERE launcher_id=? ORDER BY timestamp DESC LIMIT ?",
+            (launcher_id.hex(), count),
         )
         rows = await cursor.fetchall()
         ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]

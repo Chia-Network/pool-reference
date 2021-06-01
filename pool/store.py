@@ -86,7 +86,7 @@ class PoolStore:
             bytes.fromhex(row[8]),
             row[9],
             row[10],
-            bytes.fromhex(row[11]),
+            row[11],
             True if row[12] == 1 else False,
         )
 

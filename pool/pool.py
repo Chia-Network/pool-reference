@@ -291,9 +291,6 @@ class Pool:
                             self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
                         else:
                             self.log.error(f"Error submitting transaction: {push_tx_response}")
-                self.scan_start_height = uint32(
-                    max(self.scan_start_height, peak_height - self.confirmation_security_threshold)
-                )
                 await asyncio.sleep(self.collect_pool_rewards_interval)
             except asyncio.CancelledError:
                 self.log.info("Cancelled collect_pool_rewards_loop, closing")
@@ -623,7 +620,8 @@ class Pool:
             singleton_task = asyncio.create_task(self.get_and_validate_singleton_state_inner(partial))
             self.follow_singleton_tasks[partial.payload.launcher_id] = singleton_task
             new_singleton_state, updated, is_pool_member = await singleton_task
-            await self.follow_singleton_tasks.pop(partial.payload.launcher_id)
+            if partial.payload.launcher_id in self.follow_singleton_tasks:
+                self.follow_singleton_tasks.pop(partial.payload.launcher_id)
             if updated:
                 # This means the singleton has been changed in the blockchain (either by us or someone else). We still
                 # keep track of this singleton if the farmer has changed to a different pool, in case they switch back.

@@ -22,7 +22,7 @@ from pool import Pool
 
 
 def allow_cors(response: web.Response) -> web.Response:
-    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
 
@@ -83,9 +83,7 @@ class PoolServer:
         # It's important that on the first request from this farmer, the default difficulty is used. Changing the
         # difficulty requires a few minutes, otherwise farmers can abuse by setting the difficulty right under the
         # proof that they found.
-        farmer_record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(
-            partial.payload.launcher_id
-        )
+        farmer_record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(partial.payload.launcher_id)
         if farmer_record is not None:
             current_difficulty: uint64 = farmer_record.difficulty
             balance = farmer_record.points
@@ -109,8 +107,7 @@ class PoolServer:
             )
 
         self.pool.log.info(
-            f"Returning {res_dict}, time: {time.time() - start_time} "
-            f"singleton: {request['payload']['launcher_id']}"
+            f"Returning {res_dict}, time: {time.time() - start_time} " f"singleton: {request['payload']['launcher_id']}"
         )
         return obj_to_response(res_dict)
 
@@ -140,7 +137,7 @@ async def start_pool_server():
     )
     runner = aiohttp.web.AppRunner(app, access_log=None)
     await runner.setup()
-    site = aiohttp.web.TCPSite(runner, config["self_hostname"], int(80))
+    site = aiohttp.web.TCPSite(runner, "0.0.0.0", int(80))
     await site.start()
     await asyncio.sleep(10000000)
 

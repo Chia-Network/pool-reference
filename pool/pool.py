@@ -496,9 +496,7 @@ class Pool:
                 return
 
             async with self.store.lock:
-                farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(
-                    partial.payload.launcher_id
-                )
+                farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.launcher_id)
                 if farmer_record is None:
                     self.log.info(f"New farmer: {partial.payload.launcher_id.hex()}")
                     farmer_record = FarmerRecord(
@@ -527,7 +525,7 @@ class Pool:
                         == farmer_record.p2_singleton_puzzle_hash
                     )
 
-                    new_payout_instructions: bytes = farmer_record.pool_payout_instructions
+                    new_payout_instructions: str = farmer_record.pool_payout_instructions
                     new_authentication_pk: G1Element = farmer_record.authentication_public_key
                     new_authentication_pk_timestamp: uint64 = farmer_record.authentication_public_key_timestamp
                     if farmer_record.pool_payout_instructions != partial.payload.pool_payout_instructions:
@@ -538,7 +536,7 @@ class Pool:
                         ):
                             # This means the authentication key being used is at least as new as the one in the DB
                             self.log.info(
-                                f"Farmer changing rewards target to {partial.payload.pool_payout_instructions.hex()}"
+                                f"Farmer changing rewards target to {partial.payload.pool_payout_instructions}"
                             )
                             new_payout_instructions = partial.payload.pool_payout_instructions
                             new_authentication_pk = partial.payload.authentication_key_info.authentication_public_key
@@ -565,9 +563,7 @@ class Pool:
                     )
 
                 await self.store.add_farmer_record(farmer_record)
-                await self.store.add_partial(
-                    partial.payload.launcher_id, uint64(int(time.time())), points_received
-                )
+                await self.store.add_partial(partial.payload.launcher_id, uint64(int(time.time())), points_received)
 
             self.log.info(f"Farmer {partial.payload.owner_public_key} updated points to: " f"{farmer_record.points}")
         except Exception as e:
@@ -590,7 +586,7 @@ class Pool:
                 self.log.warning(f"Genesis coin {partial.payload.launcher_id} not spent")
                 return None
 
-            await self.node_rpc_client.get_additions_and_removals()
+            # await self.node_rpc_client.get_additions_and_removals()
             # Get genesis coin record
             # Follow children in block
             launcher_id_coin_rec = 0
@@ -600,7 +596,7 @@ class Pool:
         # follow singleton
 
         # If assigned to pool returns SingletonState
-        PoolState()
+        # PoolState()
 
         # If same coin Id, return updated False, otherwise True
         return (
@@ -624,7 +620,7 @@ class Pool:
         """
         singleton_task: Optional[Task] = self.follow_singleton_tasks.get(partial.payload.launcher_id, None)
         if singleton_task is None or singleton_task.done():
-            singleton_task = await asyncio.create_task(self.get_and_validate_singleton_state_inner(partial))
+            singleton_task = asyncio.create_task(self.get_and_validate_singleton_state_inner(partial))
             self.follow_singleton_tasks[partial.payload.launcher_id] = singleton_task
             new_singleton_state, updated, is_pool_member = await singleton_task
             await self.follow_singleton_tasks.pop(partial.payload.launcher_id)
@@ -666,14 +662,15 @@ class Pool:
         valid_sig = AugSchemeMPL.aggregate_verify(
             [pk1, pk2, pk3], [m1, m2, m2], partial.auth_key_and_partial_aggregate_signature
         )
-        self.log.error(f"Partial payload: {partial.payload} hash {partial.payload.get_hash()}")
         if not valid_sig:
             return {
                 "error_code": PoolErr.INVALID_SIGNATURE.value,
                 "error_message": f"The aggregate signature is invalid {partial.auth_key_and_partial_aggregate_signature}",
             }
 
-        if partial.payload.proof_of_space.pool_contract_puzzle_hash != launcher_id_to_p2_puzzle_hash(partial.payload.launcher_id):
+        if partial.payload.proof_of_space.pool_contract_puzzle_hash != launcher_id_to_p2_puzzle_hash(
+            partial.payload.launcher_id
+        ):
             return {
                 "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
                 "error_message": f"The puzzl h {partial.auth_key_and_partial_aggregate_signature}",
@@ -738,9 +735,7 @@ class Pool:
         if can_update_difficulty:
             async with self.store.lock:
                 # Obtains the new record in case we just updated difficulty
-                farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(
-                    partial.payload.launcher_id
-                )
+                farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.launcher_id)
                 if farmer_record is not None:
                     current_difficulty = farmer_record.difficulty
                     # Decide whether to update the difficulty

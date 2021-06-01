@@ -25,7 +25,7 @@ class FarmerRecord(Streamable):
     singleton_coin_id: bytes32  # Coin id of the singleton (might not be the last one)
     points: uint64  # Total points accumulated since last rest (or payout)
     difficulty: uint64  # Current difficulty for this farmer
-    pool_payout_instructions: bytes  # This is where the pool will pay out rewards to the farmer
+    pool_payout_instructions: str  # This is where the pool will pay out rewards to the farmer
     is_pool_member: bool  # If the farmer leaves the pool, this gets set to False
 
 
@@ -66,9 +66,7 @@ class PoolStore:
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
-        await self.connection.execute(
-            "CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)"
-        )
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
 
         await self.connection.commit()
 
@@ -107,7 +105,7 @@ class PoolStore:
                 farmer_record.singleton_coin_id.hex(),
                 farmer_record.points,
                 farmer_record.difficulty,
-                farmer_record.pool_payout_instructions.hex(),
+                farmer_record.pool_payout_instructions,
                 int(farmer_record.is_pool_member),
             ),
         )

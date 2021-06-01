@@ -21,6 +21,11 @@ from store import FarmerRecord
 from pool import Pool
 
 
+def allow_cors(response: web.Response) -> web.Response:
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
+
+
 class PoolServer:
     def __init__(self, private_key: PrivateKey, config: Dict, constants: ConsensusConstants):
 
@@ -47,8 +52,8 @@ class PoolServer:
                 else:
                     res_object = {"error_code": PoolErr.SERVER_EXCEPTION.value, "error_message": f"{e}"}
 
-                return obj_to_response(res_object)
-            return res_object
+                return allow_cors(obj_to_response(res_object))
+            return allow_cors(res_object)
 
         return inner
 

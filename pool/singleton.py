@@ -3,7 +3,6 @@ import logging
 
 from blspy import G2Element
 from chia.consensus.coinbase import pool_parent_id
-from chia.protocols.pool_protocol import SubmitPartial
 from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.program import Program, SerializedProgram, INFINITE_COST
 from chia.types.blockchain_format.sized_bytes import bytes32
@@ -22,13 +21,6 @@ POOL_ESCAPING_MOD = load_clvm("pool_escaping_innerpuz.clvm")
 singleton_mod_hash = SINGLETON_MOD.get_tree_hash()
 log = logging
 log.basicConfig(level=logging.INFO)
-
-
-async def calculate_p2_singleton_ph(partial: SubmitPartial) -> bytes32:
-    p2_singleton_full = P2_SINGLETON_MOD.curry(
-        singleton_mod_hash, Program.to(singleton_mod_hash).get_tree_hash(), partial.payload.launcher_id
-    )
-    return p2_singleton_full.get_tree_hash()
 
 
 async def create_absorb_transaction(

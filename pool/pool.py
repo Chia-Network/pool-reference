@@ -8,6 +8,7 @@ from secrets import token_bytes
 from typing import Dict, Optional, Set, List, Tuple
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
+from chia.pools.pool_wallet_info import PoolState
 from chia.protocols.pool_protocol import SubmitPartial
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
@@ -23,11 +24,12 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.consensus.pot_iterations import calculate_iterations_quality
 from chia.util.lru_cache import LRUCache
 from chia.wallet.transaction_record import TransactionRecord
+from chia.pools.pool_puzzles import launcher_id_to_p2_puzzle_hash
 
 from difficulty_adjustment import get_new_difficulty
 from error_codes import PoolErr
+from singleton import create_absorb_transaction
 from store import FarmerRecord, PoolStore
-from singleton import create_absorb_transaction, calculate_p2_singleton_ph
 
 
 @dataclasses.dataclass
@@ -79,19 +81,19 @@ class Pool:
         # that you do not want to distribute. Even if the funds are in a different address than this one, they WILL
         # be spent by this code! So only put funds that you want to distribute to pool members here.
 
-        # Using 1254429856
+        # Using 2164248527
         self.default_target_puzzle_hash: bytes32 = bytes32(
-            decode_puzzle_hash("xch1x3zc0ncx5wwmguwjesp82p8gdz9q5e7va9sj2dgqe9tvwdsrl4vqnaquh3")
+            decode_puzzle_hash("txch16mhvz4cpzwq9dmds5lkjk22h34wftcc0xx728zmqwnla2wy2gl0qancuzs")
         )
 
         # The pool fees will be sent to this address. This MUST be on a different key than the target_puzzle_hash,
-        # otherwise, the fees will be sent to the users. Using 2269911172
+        # otherwise, the fees will be sent to the users. Using 690783650
         self.pool_fee_puzzle_hash: bytes32 = bytes32(
-            decode_puzzle_hash("xch1jhydnk47xl40jn3pgwjd708uk2wqzqexagy9xxjcwt2qeaumv3fq4yfvce")
+            decode_puzzle_hash("txch1ww8m7ttxuc2ng6qlthk609hkrt25mklcuqn882rkngnygeuu8fks36ckvs")
         )
 
         # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_target_puzzle_hash`
-        self.wallet_fingerprint = 2938470744
+        self.wallet_fingerprint = 2164248527
         self.wallet_id = "1"
 
         # We need to check for slow farmers. If farmers cannot submit proofs in time, they won't be able to win
@@ -578,13 +580,13 @@ class Pool:
         farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.launcher_id)
         if farmer_record is None:
             # TODO(chia-dev)
-            genesis_coin: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
+            launcher_coin: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
                 partial.payload.launcher_id
             )
-            if genesis_coin is None:
+            if launcher_coin is None:
                 self.log.warning(f"Can not find genesis coin {partial.payload.launcher_id}")
                 return None
-            if not genesis_coin.spent:
+            if not launcher_coin.spent:
                 self.log.warning(f"Genesis coin {partial.payload.launcher_id} not spent")
                 return None
 
@@ -598,6 +600,8 @@ class Pool:
         # follow singleton
 
         # If assigned to pool returns SingletonState
+        PoolState()
+
         # If same coin Id, return updated False, otherwise True
         return (
             SingletonState(
@@ -662,17 +666,17 @@ class Pool:
         valid_sig = AugSchemeMPL.aggregate_verify(
             [pk1, pk2, pk3], [m1, m2, m2], partial.auth_key_and_partial_aggregate_signature
         )
-
+        self.log.error(f"Partial payload: {partial.payload} hash {partial.payload.get_hash()}")
         if not valid_sig:
             return {
                 "error_code": PoolErr.INVALID_SIGNATURE.value,
-                "error_message": f"The aggregate signature is invalid {partial.rewards_and_partial_aggregate_signature}",
+                "error_message": f"The aggregate signature is invalid {partial.auth_key_and_partial_aggregate_signature}",
             }
 
-        if partial.payload.proof_of_space.pool_contract_puzzle_hash != await calculate_p2_singleton_ph(partial):
+        if partial.payload.proof_of_space.pool_contract_puzzle_hash != launcher_id_to_p2_puzzle_hash(partial.payload.launcher_id):
             return {
                 "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
-                "error_message": f"The puzzl h {partial.rewards_and_partial_aggregate_signature}",
+                "error_message": f"The puzzl h {partial.auth_key_and_partial_aggregate_signature}",
             }
 
         if partial.payload.end_of_sub_slot:

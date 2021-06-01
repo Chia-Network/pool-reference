@@ -32,7 +32,7 @@ The pool periodically searches the blockchain for new pool rewards (1.75 XCH) th
 along with the singleton that they correspond to. The singleton is also locked to a `target_puzzle_hash`, which in
 this diagram is the red pool address. Anyone can spend the singleton and the `p2_singleton_puzzle_hash` coin, as 
 long as it's a block reward, and all the conditions are met. Some of these conditions require that the singleton
-always create exactly 1 new child singleton with the same genesis, and that the coinbase funds are sent to the 
+always create exactly 1 new child singleton with the same launcher id, and that the coinbase funds are sent to the 
 `target_puzzle_hash`.
 
 ### Calculating farmer rewards
@@ -53,7 +53,7 @@ however they wish. The farmer can provide their own `suggested_difficulty`, and 
 to update that farmer's difficulty. Be careful to only accept the latest authentication_public_key when setting
 difficulty or pool payout info. The initial reference client and pool do not use the `suggested_difficulty`.
 
-- Obtain the last successful partial for this singleton genesis
+- Obtain the last successful partial for this launcher id
 - If > 3 hours, divide difficulty by 5
 - If > 45 minutes < 6 hours, divide difficulty by 1.5
 - If < 45 minutes:
@@ -71,8 +71,11 @@ does not have to be an XCH address. The pool should ONLY update the payout info 
 latest seen authentication key for that launcher_id.
 
 
-### Start the server
+### Install and run
 ```
+python3 -m venv
+source ./venv/bin/activate
+pip install ../chia-blockchain/ 
 sudo CHIA_ROOT="/home/mariano/.chia/testnet7" ./venv/bin/python pool/pool_server.py
 
 ```

@@ -1,8 +1,7 @@
 # Chia Pool Protocol 1.0
 
 This is the initial version of the Chia Pool Protocol. It has been designed to be simple, and to be extended later.
-It relies on farmers having smart coins (referred to as Pool NFT in GUI + CLI) on the blockchain which allow them to dynamically set their pool to a different
-pool by making a blockchain transaction. Furthermore, it decreases the reliance on pools for block production, since
+It relies on farmers having smart coins (referred to as Pool NFT in GUI + CLI) which allow them to switch between pools by making a transaction. Furthermore, it decreases the reliance on pools for block production, since
 the protocol only handles distribution of rewards, and it protects against pools or farmers acting maliciously.
 
 ## Parties

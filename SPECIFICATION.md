@@ -62,7 +62,7 @@ The minimum difficulty that the pool supports. This will also be the default tha
 Name of the pool, this is only for display purposes and does not go on the blockchain.
 
 #### protocol_version
-The version of this pool protocol. Must be set to 1.0.
+The pool protocol version supported by the pool.
 
 #### relative_lock_height
 The number of blocks (confirmations) that a user must wait between the point when they start escaping a pool, and the

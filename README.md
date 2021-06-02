@@ -95,7 +95,7 @@ This will be referred to as the farmer's key here. Sync up your wallet on testne
 
 ```
 cd pool-reference
-python3 -m venv
+python3 -m venv ./venv
 source ./venv/bin/activate
 pip install ../chia-blockchain/ 
 sudo CHIA_ROOT="/your/home/dir/.chia/testnet7" ./venv/bin/python pool/pool_server.py
@@ -119,8 +119,9 @@ will be the following in the pool if everything is working:
 INFO:root:Returning {'points_balance': 82629918227, 'current_difficulty': 1963211364}, time: 0.017535686492919922 singleton: 0x1f8dab79a614a82f9834c8f395f5fe195ae020807169b71a10218b9788a7a573
 ```
     
-Note that claiming rewards and switching pools are still not enabled, but these will be added very shortly. Please 
+Note that claiming rewards and switching pools are still not enabled, but these will be added very shortly. Please
 send a message to @sorgente711 on keybase if you have questions about the 10 steps explained above. All other questions
-should be send to the #pools channel in keybase.
+should be send to the #pools channel in keybase. Note that there will probably be breaking changes soon which will
+require re-plotting and re-running all the steps above.
 
 

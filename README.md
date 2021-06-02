@@ -71,11 +71,57 @@ does not have to be an XCH address. The pool should ONLY update the payout info 
 latest seen authentication key for that launcher_id.
 
 
-### Install and run
-```
-python3 -m venv
-source ./venv/bin/activate
-pip install ../chia-blockchain/ 
-sudo CHIA_ROOT="/home/mariano/.chia/testnet7" ./venv/bin/python pool/pool_server.py
+### Install and run (Testnet)
+To run a pool, you must use this along with a branch of `chia-blockchain`.
+
+1. Checkout the `pools.2021-may-25` branch of `chia-blockchain`, and install it. Checkout this repo in another
+directory next to (not inside) `chia-blockchain`. Make sure to be on testnet by doing `export CHIA_ROOT=".chia/testnet7"` and `chia configure --testnet true`.
+
+2. Create two keys, one which will be used for the block rewards from the blockchain, and the other
+which will receive the pool fee that is kept by the pool.
+
+3. Change the `wallet_fingerprint` and `wallet_id` in the `pool.py` constructor, using the information from the first
+key you created in step 2. These can be obtained by doing 'chia wallet show'.
+
+4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `pool.py`
+file in `default_target_puzzle_hash` and `pool_fee_puzzle_hash` respectively.
+   
+5. Change the pool_url in pool.py to point to your external ip or hostname.
+
+6. Start the node using `chia start farmer`, and log in to a different key (not the two keys created for the pool). 
+This will be referred to as the farmer's key here. Sync up your wallet on testnet for the farmer key. 
+
+7. Create a venv (different from chia-blockchain) and start the pool server using the following commands:
 
 ```
+cd pool-reference
+python3 -m venv ./venv
+source ./venv/bin/activate
+pip install ../chia-blockchain/ 
+sudo CHIA_ROOT="/your/home/dir/.chia/testnet7" ./venv/bin/python pool/pool_server.py
+```
+
+8. You should see something like this when starting, but no errors:
+```
+INFO:root:Logging in: {'fingerprint': 2164248527, 'success': True}
+INFO:root:Obtaining balance: {'confirmed_wallet_balance': 0, 'max_send_amount': 0, 'pending_change': 0, 'pending_coin_removal_count': 0, 'spendable_balance': 0, 'unconfirmed_wallet_balance': 0, 'unspent_coin_count': 0, 'wallet_id': 1}
+```
+
+9. Create a pool nft (on the farmer key) by doing `chia poolnft create -u 127.0.0.1:80`, or whatever host:port you want
+to use for your pool. Approve it and wait for transaction confirmation.
+   
+10. Do `chia poolnft show` to ensure that your poolnft is created. Now start making some plots for this pool nft.
+You can make plots by specifying the -c argument in `chia plots create`. Make sure to *not* use the `-p` argument. The 
+    value you should use for -c is the `P2 singleton address` from `chia poolnft show` output.
+ You can start with small k25 plots and see if partials are submitted from the farmer to the pool server. The output
+will be the following in the pool if everything is working:
+```
+INFO:root:Returning {'points_balance': 82629918227, 'current_difficulty': 1963211364}, time: 0.017535686492919922 singleton: 0x1f8dab79a614a82f9834c8f395f5fe195ae020807169b71a10218b9788a7a573
+```
+    
+Note that claiming rewards and switching pools are still not enabled, but these will be added very shortly. Please
+send a message to @sorgente711 on keybase if you have questions about the 10 steps explained above. All other questions
+should be send to the #pools channel in keybase. Note that there will probably be breaking changes soon which will
+require re-plotting and re-running all the steps above.
+
+

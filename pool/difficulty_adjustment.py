@@ -1,4 +1,4 @@
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 
 from chia.util.ints import uint64
 
@@ -15,7 +15,6 @@ def get_new_difficulty(
     Given the last number_of_partials_target (or total partials we have) from a given farmer, return the new
     difficulty, or the same difficulty if we do not want to update.
     """
-    print(recent_partials)
 
     # If we haven't processed any partials yet, maintain the current (default) difficulty
     if len(recent_partials) == 0:

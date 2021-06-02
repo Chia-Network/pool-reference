@@ -8,7 +8,6 @@ from secrets import token_bytes
 from typing import Dict, Optional, Set, List, Tuple
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
-from chia.pools.pool_wallet_info import PoolState
 from chia.protocols.pool_protocol import SubmitPartial
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
@@ -726,6 +725,7 @@ class Pool:
                 "error_code": PoolErr.PROOF_NOT_GOOD_ENOUGH.value,
                 "error_message": f"Proof of space has required iters {required_iters}, too high for difficulty "
                 f"{current_difficulty}",
+                "current_difficulty": current_difficulty
             }
 
         await self.pending_point_partials.put((partial, time_received_partial, current_difficulty))

@@ -270,7 +270,7 @@ class Pool:
                             CoinRecord
                         ] = await self.node_rpc_client.get_coin_record_by_name(rec.singleton_coin_id)
                         if singleton_coin_record is None:
-                            self.log.error(f"Could not find singleton coin {rec.singleton_coin_id}")
+                            # self.log.error(f"Could not find singleton coin {rec.singleton_coin_id}")
                             continue
                         if singleton_coin_record.spent:
                             self.log.warning(f"Singleton coin {rec.singleton_coin_id} is spent")
@@ -352,6 +352,11 @@ class Pool:
                         Tuple[uint64, bytes]
                     ] = await self.store.get_farmer_points_and_payout_instructions()
                     total_points = sum([pt for (pt, ph) in points_and_ph])
+                    if total_points == 0:
+                        self.log.warning(f"No points for any farmer, waiting for {self.payment_interval} seconds")
+                        await asyncio.sleep(self.payment_interval)
+                        continue
+
                     mojo_per_point = amount_to_distribute / total_points
                     self.log.info(f"Paying out {mojo_per_point} mojo / point")
 
@@ -725,7 +730,7 @@ class Pool:
                 "error_code": PoolErr.PROOF_NOT_GOOD_ENOUGH.value,
                 "error_message": f"Proof of space has required iters {required_iters}, too high for difficulty "
                 f"{current_difficulty}",
-                "current_difficulty": current_difficulty
+                "current_difficulty": current_difficulty,
             }
 
         await self.pending_point_partials.put((partial, time_received_partial, current_difficulty))

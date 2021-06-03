@@ -11,17 +11,17 @@ a farmer process, and any number of harvester processes connected to that farmer
 run by the farmer (the default in the Chia GUI application), or run by the pool operator. If the farmer does not want
 to run a full node, they can configure their node to connect to a remote full node.
 
-A pool operator can support any number of farmers. 
+A pool operator can support any number of farmers.
 
 ## HTTPS Endpoints Summary
 
 The pool protocol consists of two HTTPS endpoints which return JSON responses. The HTTPS server can run on any port,
-but must be running with TLS enabled (using a CA approved certificate), and with pipelining enabled. 
+but must be running with TLS enabled (using a CA approved certificate), and with pipelining enabled.
 All bytes values are encoded as hex with optional 0x in front. Clients are also expected to run with pipelining.
 
 ```
 GET /pool_info
-POST /partials
+POST /partial
 GET /login (Optional)
 ```
 
@@ -30,7 +30,7 @@ GET /login (Optional)
 This takes no arguments, and allows clients to fetch information about a pool. It is called right before joining a pool,
 when the farmer enters the pool URL into the client. This allows the farmer to see information about the pool, and
 decide whether or not to join. It also allows the farmer to set the correct parameters in their singleton on the
-blockchain. Warning to client implementers: if displaying any of this information, make sure to account for malicious 
+blockchain. Warning to client implementers: if displaying any of this information, make sure to account for malicious
 scripts and JS injections. It returns a JSON response with the following data:
 ```json
 {
@@ -71,7 +71,7 @@ point at which they can finalize their pool switch.
 #### target_puzzle_hash
 This is the target of where rewards will be sent to from the singleton. Controlled by the pool.
 
-## POST /partials
+## POST /partial
 This is a partial submission from the farmer to the pool operator.
 
 Request:
@@ -125,7 +125,7 @@ The challenge of the proof of space, computed from the signage point or end of s
 
 #### payload.proof_of_space.pool_contract_puzzle_hash
 The puzzle hash that is encoded in the plots, equivalent to the `p2_singleton_puzzle_hash`. This is the first place
-that the 7/8 rewards get paid out to in the blockchain, if this proof wins. This value can be derived from the 
+that the 7/8 rewards get paid out to in the blockchain, if this proof wins. This value can be derived from the
 `launcher_id`, and must be valid for all partials.
 
 #### payload.proof_of_space.plot_public_key
@@ -138,7 +138,7 @@ K size, must be at least 32.
 64 x values encoding the actual proof of space, must be valid corresponding to the `sp_hash`.
 
 #### payload.sp_hash
-This is either the hash of the output for the signage point, or the challenge_hash for the sub slot, if it's an end 
+This is either the hash of the output for the signage point, or the challenge_hash for the sub slot, if it's an end
 of sub slot challenge. This must be a valid signage point on the blockchain that has not been reverted. The pool must
 check a few minutes after processing the partial, that it has not been reverted on the blockchain.
 
@@ -146,12 +146,12 @@ check a few minutes after processing the partial, that it has not been reverted 
 If true, the sp_hash encodes the challenge_hash of the sub slot.
 
 #### payload.suggested_difficulty
-A request from the farmer to update the difficulty. Can be ignored or respected by the pool. However, this should only 
+A request from the farmer to update the difficulty. Can be ignored or respected by the pool. However, this should only
 be respected if the authentication public key is the most recent one seen for this farmer.
 
 #### payload.launcher_id
 The launcher_id, or the identifier of the farmer's singleton on the blockchain. This uniquely identifies this
-farmer, and can be used as a primary key. The pool must periodically check the singleton on the blockchain to 
+farmer, and can be used as a primary key. The pool must periodically check the singleton on the blockchain to
 validate that it's farming to the pool, and not escaping or farming to another pool.
 
 #### payload.owner_public_key
@@ -163,7 +163,7 @@ the current incarnation of the singleton matches this value.
 This is the instructions for how the farmer wants to get paid. By default this will be an XCH address, but it can
 be set to any string with a size of less than 1024 characters, so it can represent another blockchain or payment
 system identifier. If the farmer sends new instructions here, and the partial is fully valid, the pool should
-update the instructions for this farmer. However, this should only be done if the authentication public key is the 
+update the instructions for this farmer. However, this should only be done if the authentication public key is the
 most recent one seen for this farmer.
 
 #### payload.authentication_key_info
@@ -279,5 +279,5 @@ TODO
 ### Singleton escaping
 TODO
 
-### Singleton 
+### Singleton
 TODO

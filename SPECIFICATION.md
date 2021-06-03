@@ -43,7 +43,6 @@ scripts and JS injections. It returns a JSON response with the following data:
     "relative_lock_height": 100,
     "target_puzzle_hash": "0x344587cf06a39db471d2cc027504e8688a0a67cce961253500c956c73603fd58"
 }
-
 ```
 
 #### description

@@ -15,12 +15,14 @@ A pool operator can support any number of farmers.
 
 ## HTTPS Endpoints Summary
 
-The pool protocol consists of two HTTPS endpoints which return JSON responses. The HTTPS server can run on any port,
+The pool protocol consists of several HTTPS endpoints which return JSON responses. The HTTPS server can run on any port,
 but must be running with TLS enabled (using a CA approved certificate), and with pipelining enabled.
 All bytes values are encoded as hex with optional 0x in front. Clients are also expected to run with pipelining.
 
 ```
 GET /pool_info
+POST /farmer
+PUT /farmer
 POST /partial
 GET /login (Optional)
 ```
@@ -70,32 +72,136 @@ point at which they can finalize their pool switch.
 #### target_puzzle_hash
 This is the target of where rewards will be sent to from the singleton. Controlled by the pool.
 
+## POST /farmer
+Allows farmers to make them known by the pool. This is required once before submitting the first partial.
+
+Request:
+```json
+{
+    "payload": {
+        "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
+        "owner_public_key": "0x84c3fcf9d5581c1ddc702cb0f3b4a06043303b334dd993ab42b2c320ebfa98e5ce558448615b3f69638ba92cf7f43da5",
+        "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
+        "payout_instructions": "0xc2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
+        "suggested_difficulty": 10
+    },
+    "signature": "0xa078dc1462bbcdec7cd651c5c3d7584ac6c6a142e049c7790f3b0ee8768ed6326e3a639f949b2293469be561adfa1c57130f64334994f53c1bd12e59579e27127fbabadc5e8793a2ef194a5a22ac832e92dcb6ad9a0d33bd264726f6e8df6aad"
+}
+```
+
+Successful response:
+```json
+{"welcome_message" : "Welcome to the reference pool. Happy farming."}
+```
+
+The successful response must always contain a welcome message which must be defined by the pool.
+
+#### payload
+
+#### payload.launcher_id
+The `launcher_id`, or the identifier of the farmer's singleton on the blockchain. This uniquely identifies this
+farmer, and can be used as a primary key. The pool must periodically check the singleton on the blockchain to
+validate that it's farming to the pool, and not escaping or farming to another pool.
+
+#### payload.owner_public_key
+The current owner public key of the farmer's singleton in BLS G1 format. This can change on the blockchain, but the
+initial implementation does not change it. It is used to transfer ownership of plots or singletons. The pool must check
+that the current incarnation of the singleton matches this value.
+
+#### payload.authentication_public_key
+The public key of the authentication key, which is is a temporary key used by the farmer to sign all of their requests
+to the pool. It is an authorization given by the `owner_key`, so that the owner key can be potentially kept more secure.
+The timestamp is the time at which the `owner_key` approved this key, and therefore the `owner_key` can revoke older
+keys by issuing an authentication key with a new timestamp. The pool can accept partials with outdated
+`authentication_keys`, but the pool must not update the difficulty or the payout instructions.
+
+#### payload.payout_instructions
+This is the instructions for how the farmer wants to get paid. By default this will be an XCH address, but it can
+be set to any string with a size of less than 1024 characters, so it can represent another blockchain or payment
+system identifier. If the farmer sends new instructions here, and the partial is fully valid, the pool should
+update the instructions for this farmer. However, this should only be done if the authentication public key is the
+most recent one seen for this farmer.
+
+#### payload.suggested_difficulty
+A request from the farmer to update the difficulty. Can be ignored or respected by the pool. However, this should only
+be respected if the authentication public key is the most recent one seen for this farmer.
+
+#### signature
+This is a BLS signature signed by the private key of the `owner_public_key` using the Augmented Scheme in the
+BLS IETF spec. The message must be the `payload` object in streamable format.
+
+A payload must be completely rejected if the BLS signature does not validate.
+
+## PUT /farmer
+Allows farmers to update their information on the pool.
+
+Request:
+```json
+{
+    "payload": {
+        "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
+        "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
+        "payout_instructions": "0xc2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
+        "suggested_difficulty": 10
+    },
+    "signature": "0xa078dc1462bbcdec7cd651c5c3d7584ac6c6a142e049c7790f3b0ee8768ed6326e3a639f949b2293469be561adfa1c57130f64334994f53c1bd12e59579e27127fbabadc5e8793a2ef194a5a22ac832e92dcb6ad9a0d33bd264726f6e8df6aad"
+}
+```
+
+For a description of the request body entries see the corresponding keys in [POST /farmer](#post-farmer). The values
+provided with the key/value pairs are used to update the existing values. All entries, except `launcher_id`, are
+optional but there must be at least one of them.
+
+Successful response:
+```json
+{
+  "authentication_public_key": true,
+  "payout_instructions": true,
+  "suggested_difficulty": true
+}
+```
+
+The successful response must always contain one key/value pair for each entry provided in the request body. The value
+must be `true` if the entry has been updated or `false` if the value was the same as the current value.
+
+See below for an example body to only update the authentication key:
+
+Example to update `authentication_public_key`:
+```json
+{
+    "payload": {
+        "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
+        "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29"
+    },
+    "signature": "0xa078dc1462bbcdec7cd651c5c3d7584ac6c6a142e049c7790f3b0ee8768ed6326e3a639f949b2293469be561adfa1c57130f64334994f53c1bd12e59579e27127fbabadc5e8793a2ef194a5a22ac832e92dcb6ad9a0d33bd264726f6e8df6aad"
+}
+```
+
+Failed response:
+```json
+{"error_code": 4, "error_message": "Invalid proof of space"}
+```
+Failed responses must include an error code as well as an english error message.
+
 ## POST /partial
 This is a partial submission from the farmer to the pool operator.
 
 Request:
 ```json
 {
-    "payload": {
-        "proof_of_space": {
-            "challenge": "0xe0e55d45eef8d53a6b68220abeec8f14f57baaa80dbd7b37430e42f9ac6e2c0e",
-            "pool_contract_puzzle_hash": "0x9e3e9b37b54cf6c7467e277b6e4ca9ab6bdea53cdc1d79c000dc95b6a3908a3b",
-            "plot_public_key": "0xa7ad70989cc8f18e555e9b698d197cdfc32465e0b99fd6cf5fdbac8aa2da04b0704ba04d2d50d852402f9dd6eec47a4d",
-            "size": 32,
-            "proof": "0xb2cd6374c8db249ad3b638199dbb6eb9eaefe55042cef66c43cf1e31161f4a1280455d8b53c2823c747fd4f8823c44de3a52cc85332431630857c359935660c3403ae3a92728d003dd66ef5966317cd49894d265a3e4c43f0530a1192874ed327e6f35862a25dfb67c5d0d573d078b4b8ba9bfb1cce52fd17939ae9d7033d3aa09d6c449e392ba2472a1fecf992abcc51c3bf5d56a72fef9900e79b8dba88a5afc39e04993325a0cd6b67757355b836f"
-        },
-        "sp_hash": "0x4c52796ca4ff775fbcdac90140c12270d26a37724ad77988535d58b376332533",
-        "end_of_sub_slot": false,
-        "suggested_difficulty": 10,
-        "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
-        "owner_public_key": "0x84c3fcf9d5581c1ddc702cb0f3b4a06043303b334dd993ab42b2c320ebfa98e5ce558448615b3f69638ba92cf7f43da5",
-        "pool_payout_instructions": "c2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
-        "authentication_key_info": {
-            "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
-            "authentication_public_key_timestamp": 1621854388
-        }
+  "payload": {
+    "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
+    "proof_of_space": {
+      "challenge": "0xe0e55d45eef8d53a6b68220abeec8f14f57baaa80dbd7b37430e42f9ac6e2c0e",
+      "pool_contract_puzzle_hash": "0x9e3e9b37b54cf6c7467e277b6e4ca9ab6bdea53cdc1d79c000dc95b6a3908a3b",
+      "plot_public_key": "0xa7ad70989cc8f18e555e9b698d197cdfc32465e0b99fd6cf5fdbac8aa2da04b0704ba04d2d50d852402f9dd6eec47a4d",
+      "size": 32,
+      "proof": "0xb2cd6374c8db249ad3b638199dbb6eb9eaefe55042cef66c43cf1e31161f4a1280455d8b53c2823c747fd4f8823c44de3a52cc85332431630857c359935660c3403ae3a92728d003dd66ef5966317cd49894d265a3e4c43f0530a1192874ed327e6f35862a25dfb67c5d0d573d078b4b8ba9bfb1cce52fd17939ae9d7033d3aa09d6c449e392ba2472a1fecf992abcc51c3bf5d56a72fef9900e79b8dba88a5afc39e04993325a0cd6b67757355b836f"
     },
-    "auth_key_and_partial_aggregate_signature": "0xa078dc1462bbcdec7cd651c5c3d7584ac6c6a142e049c7790f3b0ee8768ed6326e3a639f949b2293469be561adfa1c57130f64334994f53c1bd12e59579e27127fbabadc5e8793a2ef194a5a22ac832e92dcb6ad9a0d33bd264726f6e8df6aad"
+    "sp_hash": "0x4c52796ca4ff775fbcdac90140c12270d26a37724ad77988535d58b376332533",
+    "end_of_sub_slot": false
+  },
+  "aggregate_signature": "0xa078dc1462bbcdec7cd651c5c3d7584ac6c6a142e049c7790f3b0ee8768ed6326e3a639f949b2293469be561adfa1c57130f64334994f53c1bd12e59579e27127fbabadc5e8793a2ef194a5a22ac832e92dcb6ad9a0d33bd264726f6e8df6aad"
 }
 ```
 
@@ -115,6 +221,11 @@ Failed responses must include an error code as well as an english error message.
 
 #### payload
 This is the main payload of the partial, which is signed by two keys: `authentication_key` and `plot_key`.
+
+#### payload.launcher_id
+The `launcher_id`, or the identifier of the farmer's singleton on the blockchain. This uniquely identifies this
+farmer, and can be used as a primary key. The pool must periodically check the singleton on the blockchain to
+validate that it's farming to the pool, and not escaping or farming to another pool.
 
 #### payload.proof_of_space
 The proof of space in chia-blockchain format.
@@ -144,45 +255,10 @@ check a few minutes after processing the partial, that it has not been reverted 
 #### payload.end_of_sub_slot
 If true, the sp_hash encodes the challenge_hash of the sub slot.
 
-#### payload.suggested_difficulty
-A request from the farmer to update the difficulty. Can be ignored or respected by the pool. However, this should only
-be respected if the authentication public key is the most recent one seen for this farmer.
-
-#### payload.launcher_id
-The launcher_id, or the identifier of the farmer's singleton on the blockchain. This uniquely identifies this
-farmer, and can be used as a primary key. The pool must periodically check the singleton on the blockchain to
-validate that it's farming to the pool, and not escaping or farming to another pool.
-
-#### payload.owner_public_key
-The current owner public key of the farmer's singleton. This can change on the blockchain, but the initial
-implementation does not change it. It is used to transfer ownership of plots or singletons. The pool must check that
-the current incarnation of the singleton matches this value.
-
-#### payload.pool_payout_instructions
-This is the instructions for how the farmer wants to get paid. By default this will be an XCH address, but it can
-be set to any string with a size of less than 1024 characters, so it can represent another blockchain or payment
-system identifier. If the farmer sends new instructions here, and the partial is fully valid, the pool should
-update the instructions for this farmer. However, this should only be done if the authentication public key is the
-most recent one seen for this farmer.
-
-#### payload.authentication_key_info
-An authentication key, is a temporary key which the farmer uses to sign all of their requests to the pool. It is an
-authorization given by the `owner_key`, so that the owner key can be potentially kept more secure. The timestamp is
-the time at which the `owner_key` approved this key, and therefore the `owner_key` can revoke older keys by issuing
-an authentication key with a new timestamp. The pool can accept partials with outdated `authentication_keys`, but the
-pool must not update the difficulty or the payout instructions.
-
-#### payload.authentication_key_info.authentication_public_key
-Public key in BLS G1 format.
-
-#### payload.authentication_key_info.authentication_public_key_timestamp
-Timestamp of approval in unix time.
-
-#### auth_key_and_partial_aggregate_signature
-This is a 3/3 BLS aggregate signature using the Augmented Scheme in the BLS IETF spec.
+#### aggregate_signature
+This is a 2/2 BLS aggregate signature using the Augmented Scheme in the BLS IETF spec.
 1. Message: `payload` in streamable format, public key: `plot_public_key`
 2. Message: `payload` in streamable format, public key: `authentication_public_key`
-3. Message: `authentication_key_info` in streamable format, public key: `owner_public_key`
 
 A partial must be completely rejected if the BLS signature does not validate.
 

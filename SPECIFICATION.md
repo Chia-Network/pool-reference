@@ -79,7 +79,7 @@ scripts and JS injections. It returns a JSON response with the following data:
 The description is a short paragraph that can be displayed in GUIs when the farmer enters a pool URL.
 
 #### fee
-The fee that the pool charges by default, a number between 0 and 1. This does not include blockchain transaction fees.
+The fee that the pool charges by default, a number between 0 (0%) and 1 (100%). This does not include blockchain transaction fees.
 
 #### logo_url
 A URL for a pool logo that the client can display in the UI. This is optional for v1.0.

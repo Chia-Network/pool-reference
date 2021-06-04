@@ -6,7 +6,7 @@ the protocol only handles distribution of rewards, and it protects against pools
 
 ## Parties
 
-The parties involved in the pool protocol involve the pool operator and farmers. Each farmer is running
+The parties involved in the pool protocol are the pool operator and farmers. Each farmer is running
 a farmer process, and any number of harvester processes connected to that farmer process. The full node can either be
 run by the farmer (the default in the Chia GUI application), or run by the pool operator. If the farmer does not want
 to run a full node, they can configure their node to connect to a remote full node.

@@ -32,13 +32,13 @@ async def create_absorb_transaction(
 ) -> SpendBundle:
     # We assume that the farmer record singleton state is updated to the latest
     escape_inner_puzzle: Program = POOL_ESCAPING_MOD.curry(
-        farmer_record.pool_puzzle_hash,
+        farmer_record.target_puzzle_hash,
         relative_lock_height,
         bytes(farmer_record.owner_public_key),
         farmer_record.p2_singleton_puzzle_hash,
     )
     committed_inner_puzzle: Program = POOL_COMMITED_MOD.curry(
-        farmer_record.pool_puzzle_hash,
+        farmer_record.target_puzzle_hash,
         escape_inner_puzzle.get_tree_hash(),
         farmer_record.p2_singleton_puzzle_hash,
         bytes(farmer_record.owner_public_key),
@@ -48,7 +48,7 @@ async def create_absorb_transaction(
     for reward_coin_record in reward_coin_records:
         found_block_index: Optional[uint32] = None
         for block_index in range(
-            reward_coin_record.confirmed_block_index, reward_coin_record.confirmed_block_index - 100, -1
+                reward_coin_record.confirmed_block_index, reward_coin_record.confirmed_block_index - 100, -1
         ):
             if block_index < 0:
                 break
@@ -65,7 +65,8 @@ async def create_absorb_transaction(
         )
 
         inner_sol = Program.to(
-            [0, singleton_full.get_tree_hash(), singleton_coin.amount, reward_coin_record.amount, found_block_index]
+            [0, singleton_full.get_tree_hash(), singleton_coin.amount, reward_coin_record.coin.amount,
+             found_block_index]
         )
         full_sol = Program.to([farmer_record.launcher_id, singleton_coin.amount, inner_sol])
 
@@ -77,7 +78,7 @@ async def create_absorb_transaction(
         aggregate_spend_bundle = SpendBundle.aggregate([aggregate_spend_bundle, new_spend])
 
         # The new singleton will have the same puzzle hash and amount, but just have a different parent (old singleton)
-        singleton_coin = Coin(singleton_coin.name(), singleton_coin.puzzle_hash(), singleton_coin.amount)
+        singleton_coin = Coin(singleton_coin.name(), singleton_coin.puzzle_hash, singleton_coin.amount)
 
         cost, result = singleton_full.run_with_cost(INFINITE_COST, full_sol)
         log.info(f"Cost: {cost}, result {result}")

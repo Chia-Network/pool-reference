@@ -48,7 +48,7 @@ async def create_absorb_transaction(
     for reward_coin_record in reward_coin_records:
         found_block_index: Optional[uint32] = None
         for block_index in range(
-                reward_coin_record.confirmed_block_index, reward_coin_record.confirmed_block_index - 100, -1
+            reward_coin_record.confirmed_block_index, reward_coin_record.confirmed_block_index - 100, -1
         ):
             if block_index < 0:
                 break

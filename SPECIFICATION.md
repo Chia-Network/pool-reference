@@ -27,6 +27,29 @@ POST /partial
 GET /login (Optional)
 ```
 
+## Error codes
+
+A failed endpoint will always return a JSON object with an error code and an
+english error message as shown below:
+
+```json
+{"error_code": 0, "error_message": ""}
+```
+
+The following errors may occur:
+
+|Error code|Description|
+|---|---|
+| 0x01 | The provided signage point has been reverted |
+| 0x02 | Received partial too late |
+| 0x03 | Not found |
+| 0x04 | Proof of space invalid |
+| 0x05 | Proof of space not good enough |
+| 0x06 | Invalid difficulty |
+| 0x07 | Invalid signature |
+| 0x08 | Web-Server raised an exception|
+| 0x09 | Invalid puzzle hash|
+
 ## GET /pool_info
 
 This takes no arguments, and allows clients to fetch information about a pool. It is called right before joining a pool,
@@ -177,12 +200,6 @@ Example to update `authentication_public_key`:
 }
 ```
 
-Failed response:
-```json
-{"error_code": 4, "error_message": "Invalid proof of space"}
-```
-Failed responses must include an error code as well as an english error message.
-
 ## POST /partial
 This is a partial submission from the farmer to the pool operator.
 
@@ -212,12 +229,6 @@ Successful response:
 
 The successful response must always contain the points balance since the last payout, as well as the current difficulty
 that this farmer is being given credit for.
-
-Failed response:
-```json
-{"error_code": 4, "error_message": "Invalid proof of space"}
-```
-Failed responses must include an error code as well as an english error message.
 
 #### payload
 This is the main payload of the partial, which is signed by two keys: `authentication_key` and `plot_key`.
@@ -323,20 +334,6 @@ For example, 100 TiB of space should yield approximately 10,000 points per day, 
 100 or 200. It should not matter what difficulty is set for a farmer, as long as they are consistently submitting partials.
 The specification does not require pools to pay out proportionally by points, but the payout scheme should be clear to
 farmers, and points should be acknowledged and accumulated points returned in the response.
-
-
-## Error codes
-```
-REVERTED_SIGNAGE_POINT = 1
-TOO_LATE = 2
-NOT_FOUND = 3
-INVALID_PROOF = 4
-PROOF_NOT_GOOD_ENOUGH = 5
-INVALID_DIFFICULTY = 6
-INVALID_SIGNATURE = 7
-SERVER_EXCEPTION = 8
-INVALID_P2_SINGLETON_PUZZLE_HASH = 9
-```
 
 ## Security considerations
 The pool must ensure that partials arrive quickly, faster than the 28 second time limit of inclusion into the

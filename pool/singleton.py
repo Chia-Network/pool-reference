@@ -17,7 +17,7 @@ from store import FarmerRecord
 SINGLETON_MOD = load_clvm("singleton_top_layer.clvm")
 P2_SINGLETON_MOD = load_clvm("p2_singleton.clvm")
 POOL_COMMITED_MOD = load_clvm("pool_member_innerpuz.clvm")
-POOL_ESCAPING_MOD = load_clvm("pool_escaping_innerpuz.clvm")
+POOL_ESCAPING_MOD = load_clvm("pool_waitingroom_innerpuz.clvm")
 singleton_mod_hash = SINGLETON_MOD.get_tree_hash()
 log = logging
 log.basicConfig(level=logging.INFO)

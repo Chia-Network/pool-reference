@@ -122,6 +122,6 @@ INFO:root:Returning {'points_balance': 82629918227, 'current_difficulty': 196321
 Note that claiming rewards and switching pools are still not enabled, but these will be added very shortly. Please
 send a message to @sorgente711 on keybase if you have questions about the 10 steps explained above. All other questions
 should be send to the #pools channel in keybase. Note that there will probably be breaking changes soon which will
-require re-plotting and re-running all the steps above.
-
+require re-plotting and re-running all the steps above. Please note that currently, a lower difficulty constant factor
+is used, so testing can be done with small plots. 
 

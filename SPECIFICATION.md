@@ -24,13 +24,11 @@ The pool protocol consists of several HTTPS endpoints which return JSON response
 but must be running with TLS enabled (using a CA approved certificate), and with pipelining enabled.
 All bytes values are encoded as hex with optional 0x in front. Clients are also expected to run with pipelining.
 
-```
-GET /pool_info
-POST /farmer
-PUT /farmer
-POST /partial
-GET /login (Optional)
-```
+- [GET /pool_info](#get-pool_info)
+- [POST /farmer](#post-farmer)
+- [PUT /farmer](#put-farmer)
+- [POST /partial](#post-partial)
+- [GET /login (Optional)](#get-login)
 
 ## Error codes
 

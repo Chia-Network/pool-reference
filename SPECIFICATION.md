@@ -49,6 +49,11 @@ The following errors may occur:
 | 0x07 | Invalid signature |
 | 0x08 | Web-Server raised an exception|
 | 0x09 | Invalid puzzle hash|
+| 0x0A | Farmer not known |
+| 0x0B | Farmer already known |
+| 0x0C | Invalid owner public key |
+| 0x0D | Invalid authentication public key |
+| 0x0E | Invalid payout instructions |
 
 ## GET /pool_info
 

@@ -19,7 +19,7 @@ setup(
     description=("A reference pool for the Chia blockchain."),
     license="Apache",
     packages=setuptools.find_packages(),
-    install_requires=["wheel", "chia-blockchain", "Flask"],
+    install_requires=["wheel", "Flask"],
     long_description=read("README.md"),
     classifiers=[
         "Development Status :: 3 - Alpha",

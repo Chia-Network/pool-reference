@@ -17,9 +17,9 @@ from chia.util.ints import uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 
-from error_codes import PoolErr
-from store import FarmerRecord
-from pool import Pool
+from pool.error_codes import PoolErr
+from pool.store import FarmerRecord
+from pool.pool import Pool
 
 
 def allow_cors(response: web.Response) -> web.Response:

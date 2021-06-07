@@ -31,10 +31,10 @@ from chia.pools.pool_puzzles import (
     get_most_recent_singleton_coin_from_coin_solution,
 )
 
-from difficulty_adjustment import get_new_difficulty
-from error_codes import PoolErr
-from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
-from store import FarmerRecord, PoolStore
+from pool.difficulty_adjustment import get_new_difficulty
+from pool.error_codes import PoolErr
+from pool.singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
+from pool.store import FarmerRecord, PoolStore
 
 
 class Pool:

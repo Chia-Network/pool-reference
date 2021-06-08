@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import logging
 import time
 import traceback
@@ -8,13 +7,15 @@ from secrets import token_bytes
 from typing import Dict, Optional, Set, List, Tuple
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
+from chia.pools.pool_wallet_info import PoolState, PoolSingletonState, POOL_PROTOCOL_VERSION
 from chia.protocols.pool_protocol import SubmitPartial
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.coin_record import CoinRecord
+from chia.types.coin_solution import CoinSolution
 from chia.util.bech32m import decode_puzzle_hash
 from chia.consensus.constants import ConsensusConstants
-from chia.util.ints import uint64, uint16, uint32
+from chia.util.ints import uint64, uint16, uint32, uint8
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.full_node.signage_point import SignagePoint
@@ -23,23 +24,14 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.consensus.pot_iterations import calculate_iterations_quality
 from chia.util.lru_cache import LRUCache
 from chia.wallet.transaction_record import TransactionRecord
-from chia.pools.pool_puzzles import launcher_id_to_p2_puzzle_hash
+from chia.pools.pool_puzzles import (
+    launcher_id_to_p2_puzzle_hash,
+)
 
 from difficulty_adjustment import get_new_difficulty
 from error_codes import PoolErr
-from singleton import create_absorb_transaction
+from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
 from store import FarmerRecord, PoolStore
-
-
-@dataclasses.dataclass
-class SingletonState:
-    pool_url: str
-    pool_puzzle_hash: bytes32
-    relative_lock_height: uint32
-    minimum_difficulty: uint64
-    escaping: bool
-    blockchain_height: uint32
-    singleton_coin_id: bytes32
 
 
 class Pool:
@@ -67,7 +59,8 @@ class Pool:
         self.relative_lock_height = uint32(100)
 
         # TODO(pool): potentially tweak these numbers for security and performance
-        self.pool_url = "https://myreferencepool.com"
+        # This is what the user enters into the input field. This exact value will be stored on the blockchain
+        self.pool_url = "http://127.0.0.1:80"
         self.min_difficulty = uint64(10)  # 10 difficulty is about 1 proof a day per plot
         self.default_difficulty: uint64 = uint64(10)
 
@@ -270,17 +263,16 @@ class Pool:
                             CoinRecord
                         ] = await self.node_rpc_client.get_coin_record_by_name(rec.singleton_coin_id)
                         if singleton_coin_record is None:
-                            # self.log.error(f"Could not find singleton coin {rec.singleton_coin_id}")
                             continue
                         if singleton_coin_record.spent:
                             self.log.warning(f"Singleton coin {rec.singleton_coin_id} is spent")
                             continue
 
                         spend_bundle = await create_absorb_transaction(
+                            self.node_rpc_client,
                             rec,
-                            singleton_coin_record.coin,
+                            self.blockchain_state["peak"].height,
                             ph_to_coins[rec.p2_singleton_puzzle_hash],
-                            self.relative_lock_height,
                             self.constants.GENESIS_CHALLENGE,
                         )
 
@@ -487,13 +479,16 @@ class Pool:
             self.recent_points_added.put(pos_hash, uint64(1))
 
             # Now we need to check to see that the singleton in the blockchain is still assigned to this pool
-            singleton_state: Optional[SingletonState] = await self.get_and_validate_singleton_state(partial)
+            singleton_state_tuple: Optional[
+                Tuple[CoinSolution, PoolState]
+            ] = await self.get_and_validate_singleton_state(partial)
 
-            if singleton_state is None:
+            if singleton_state_tuple is None:
                 # This singleton doesn't exist, or isn't assigned to our pool
                 return
-            if singleton_state.escaping:
-                # Don't give rewards while escaping from the pool (is this necessary?)
+            last_spend, last_state = singleton_state_tuple
+            if last_state.state == PoolSingletonState.LEAVING_POOL.value:
+                # Don't give rewards while escaping from the pool
                 return
 
             async with self.store.lock:
@@ -502,14 +497,11 @@ class Pool:
                     self.log.info(f"New farmer: {partial.payload.launcher_id.hex()}")
                     farmer_record = FarmerRecord(
                         partial.payload.launcher_id,
+                        partial.payload.proof_of_space.pool_contract_puzzle_hash,
                         partial.payload.authentication_key_info.authentication_public_key,
                         partial.payload.authentication_key_info.authentication_public_key_timestamp,
-                        partial.payload.owner_public_key,
-                        self.default_target_puzzle_hash,
-                        singleton_state.relative_lock_height,
-                        partial.payload.proof_of_space.pool_contract_puzzle_hash,
-                        singleton_state.blockchain_height,
-                        singleton_state.singleton_coin_id,
+                        last_spend,
+                        last_state,
                         points_received,
                         partial.payload.suggested_difficulty,
                         partial.payload.pool_payout_instructions,
@@ -520,7 +512,7 @@ class Pool:
                     if not farmer_record.is_pool_member:
                         # Don't award points to non pool members
                         return
-                    assert partial.payload.owner_public_key == farmer_record.owner_public_key
+                    assert partial.payload.owner_public_key == farmer_record.singleton_tip_state.owner_pubkey
                     assert (
                         partial.payload.proof_of_space.pool_contract_puzzle_hash
                         == farmer_record.p2_singleton_puzzle_hash
@@ -549,14 +541,11 @@ class Pool:
                             self.log.info("Not changing pool payout instructions, don't have newest authentication key")
                     farmer_record = FarmerRecord(
                         partial.payload.launcher_id,
+                        partial.payload.proof_of_space.pool_contract_puzzle_hash,
                         new_authentication_pk,
                         new_authentication_pk_timestamp,
-                        partial.payload.owner_public_key,
-                        self.default_target_puzzle_hash,
-                        singleton_state.relative_lock_height,
-                        partial.payload.proof_of_space.pool_contract_puzzle_hash,
-                        singleton_state.blockchain_height,
-                        singleton_state.singleton_coin_id,
+                        last_spend,
+                        last_state,
                         uint64(farmer_record.points + points_received),
                         farmer_record.difficulty,
                         new_payout_instructions,
@@ -571,75 +560,69 @@ class Pool:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
 
-    async def get_and_validate_singleton_state_inner(
+    async def get_and_validate_singleton_state(
         self, partial: SubmitPartial
-    ) -> Optional[Tuple[SingletonState, bool, bool]]:
-        farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.launcher_id)
-        if farmer_record is None:
-            # TODO(chia-dev)
-            launcher_coin: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
-                partial.payload.launcher_id
-            )
-            if launcher_coin is None:
-                self.log.warning(f"Can not find genesis coin {partial.payload.launcher_id}")
-                return None
-            if not launcher_coin.spent:
-                self.log.warning(f"Genesis coin {partial.payload.launcher_id} not spent")
-                return None
-
-            # await self.node_rpc_client.get_additions_and_removals()
-            # Get genesis coin record
-            # Follow children in block
-            launcher_id_coin_rec = 0
-
-        # While spent
-        # Get coin additions and removals
-        # follow singleton
-
-        # If assigned to pool returns SingletonState
-        # PoolState()
-
-        # If same coin Id, return updated False, otherwise True
-        return (
-            SingletonState(
-                self.pool_url,
-                self.default_target_puzzle_hash,
-                self.relative_lock_height,
-                self.min_difficulty,
-                False,
-                0,
-                token_bytes(32),
-            ),
-            False,
-            True,
-        )
-
-    async def get_and_validate_singleton_state(self, partial: SubmitPartial) -> Optional[SingletonState]:
+    ) -> Optional[Tuple[CoinSolution, PoolState]]:
         """
         :return: the state of the singleton, if it currently exists in the blockchain, and if it is assigned to
-        our pool, with the correct parameters.
+        our pool, with the correct parameters. Otherwise, None. Note that this state must be buried (recent state
+        changes are not returned)
         """
         singleton_task: Optional[Task] = self.follow_singleton_tasks.get(partial.payload.launcher_id, None)
+        remove_after = False
         if singleton_task is None or singleton_task.done():
-            singleton_task = asyncio.create_task(self.get_and_validate_singleton_state_inner(partial))
-            self.follow_singleton_tasks[partial.payload.launcher_id] = singleton_task
-            new_singleton_state, updated, is_pool_member = await singleton_task
-            if partial.payload.launcher_id in self.follow_singleton_tasks:
-                self.follow_singleton_tasks.pop(partial.payload.launcher_id)
-            if updated:
-                # This means the singleton has been changed in the blockchain (either by us or someone else). We still
-                # keep track of this singleton if the farmer has changed to a different pool, in case they switch back.
-                assert new_singleton_state is not None
-                await self.store.update_singleton(
-                    partial.payload.launcher_id, new_singleton_state.singleton_coin_id, is_pool_member
+            farmer_rec: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.launcher_id)
+            peak_height: uint32 = self.blockchain_state["peak"].height
+            if farmer_rec is None:
+                desired_state: PoolState = PoolState(
+                    POOL_PROTOCOL_VERSION,
+                    PoolSingletonState.FARMING_TO_POOL.value,
+                    self.default_target_puzzle_hash,
+                    partial.payload.owner_public_key,
+                    self.pool_url,
+                    self.relative_lock_height,
                 )
+            else:
+                desired_state = PoolState(
+                    POOL_PROTOCOL_VERSION,
+                    PoolSingletonState.FARMING_TO_POOL.value,
+                    self.default_target_puzzle_hash,
+                    farmer_rec.singleton_tip_state.owner_pubkey,
+                    self.pool_url,
+                    self.relative_lock_height,
+                )
+            singleton_task = asyncio.create_task(
+                get_and_validate_singleton_state_inner(
+                    self.node_rpc_client,
+                    partial.payload.launcher_id,
+                    farmer_rec,
+                    peak_height,
+                    self.confirmation_security_threshold,
+                    desired_state,
+                )
+            )
+            self.follow_singleton_tasks[partial.payload.launcher_id] = singleton_task
+            remove_after = True
 
-        else:
-            # Don't need to update in this case, because there is already another coroutine updating, so we just
-            # wait for that
-            new_singleton_state, _, _ = await singleton_task
+        optional_result: Optional[Tuple[CoinSolution, PoolState, bool, bool]] = await singleton_task
+        if remove_after and partial.payload.launcher_id in self.follow_singleton_tasks:
+            self.follow_singleton_tasks.pop(partial.payload.launcher_id)
 
-        return new_singleton_state
+        if optional_result is None:
+            return None
+
+        singleton_tip, singleton_tip_state, updated, is_pool_member = optional_result
+        if updated and remove_after:
+            # This means the singleton has been changed in the blockchain (either by us or someone else). We
+            # still keep track of this singleton if the farmer has changed to a different pool, in case they
+            # switch back.
+            await self.store.update_singleton(
+                partial.payload.launcher_id, singleton_tip, singleton_tip_state, is_pool_member
+            )
+
+        if is_pool_member:
+            return singleton_tip, singleton_tip_state
+        return None
 
     async def process_partial(
         self,
@@ -675,7 +658,7 @@ class Pool:
         ):
             return {
                 "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
-                "error_message": f"The puzzl h {partial.auth_key_and_partial_aggregate_signature}",
+                "error_message": f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}",
             }
 
         if partial.payload.end_of_sub_slot:

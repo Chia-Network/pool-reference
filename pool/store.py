@@ -5,7 +5,9 @@ from typing import Optional, Set, List, Tuple, Dict
 
 import aiosqlite
 from blspy import G1Element
+from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32
+from chia.types.coin_solution import CoinSolution
 from chia.util.ints import uint32, uint64
 
 from chia.util.streamable import streamable, Streamable
@@ -15,14 +17,11 @@ from chia.util.streamable import streamable, Streamable
 @streamable
 class FarmerRecord(Streamable):
     launcher_id: bytes32  # This uniquely identifies the singleton on the blockchain (ID for this farmer)
+    p2_singleton_puzzle_hash: bytes32  # Derived from the launcher id
     authentication_public_key: G1Element  # This is the latest public key of the farmer (signs all partials)
     authentication_public_key_timestamp: uint64  # The timestamp of approval of the latest public key, by the owner key
-    owner_public_key: G1Element  # The public key of the owner of the singleton, must be on the blockchain
-    target_puzzle_hash: bytes32  # Target puzzle hash in the singleton
-    relative_lock_height: uint32  # Relative lock height in the singleton
-    p2_singleton_puzzle_hash: bytes32  # This is the puzzle hash in the plots, coinbase rewards get stored here
-    blockchain_height: uint32  # Height of the singleton (might not be the last one)
-    singleton_coin_id: bytes32  # Coin id of the singleton (might not be the last one)
+    singleton_tip: CoinSolution  # Last coin solution that is buried in the blockchain, for this singleton
+    singleton_tip_state: PoolState  # Current state of the singleton
     points: uint64  # Total points accumulated since last rest (or payout)
     difficulty: uint64  # Current difficulty for this farmer
     pool_payout_instructions: str  # This is where the pool will pay out rewards to the farmer
@@ -45,14 +44,11 @@ class PoolStore:
             (
                 "CREATE TABLE IF NOT EXISTS farmer("
                 "launcher_id text PRIMARY KEY,"
+                " p2_singleton_puzzle_hash text,"
                 " authentication_public_key text,"
                 " authentication_public_key_timestamp bigint,"
-                " owner_public_key text,"
-                " target_puzzle_hash text,"
-                " relative_lock_height bigint,"
-                " p2_singleton_puzzle_hash text,"
-                " blockchain_height bigint,"
-                " singleton_coin_id text,"
+                " singleton_tip blob,"
+                " singleton_tip_state blob,"
                 " points bigint,"
                 " difficulty bigint,"
                 " pool_payout_instructions text,"
@@ -76,33 +72,27 @@ class PoolStore:
     def _row_to_farmer_record(row) -> FarmerRecord:
         return FarmerRecord(
             bytes.fromhex(row[0]),
-            G1Element.from_bytes(bytes.fromhex(row[1])),
-            row[2],
-            G1Element.from_bytes(bytes.fromhex(row[3])),
-            bytes.fromhex(row[4]),
-            row[5],
-            bytes.fromhex(row[6]),
+            bytes.fromhex(row[1]),
+            G1Element.from_bytes(bytes.fromhex(row[2])),
+            row[3],
+            CoinSolution.from_bytes(row[4]),
+            PoolState.from_bytes(row[5]),
+            row[6],
             row[7],
-            bytes.fromhex(row[8]),
-            row[9],
-            row[10],
-            row[11],
-            True if row[12] == 1 else False,
+            row[8],
+            True if row[9] == 1 else False,
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord):
         cursor = await self.connection.execute(
-            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 farmer_record.launcher_id.hex(),
+                farmer_record.p2_singleton_puzzle_hash.hex(),
                 bytes(farmer_record.authentication_public_key).hex(),
                 farmer_record.authentication_public_key_timestamp,
-                bytes(farmer_record.owner_public_key).hex(),
-                farmer_record.target_puzzle_hash.hex(),
-                farmer_record.relative_lock_height,
-                farmer_record.p2_singleton_puzzle_hash.hex(),
-                farmer_record.blockchain_height,
-                farmer_record.singleton_coin_id.hex(),
+                bytes(farmer_record.singleton_tip),
+                bytes(farmer_record.singleton_tip_state),
                 farmer_record.points,
                 farmer_record.difficulty,
                 farmer_record.pool_payout_instructions,
@@ -130,10 +120,20 @@ class PoolStore:
         await cursor.close()
         await self.connection.commit()
 
-    async def update_singleton(self, launcher_id: bytes32, singleton_coin_id: bytes32, is_pool_member: bool):
+    async def update_singleton(
+        self,
+        launcher_id: bytes32,
+        singleton_tip: CoinSolution,
+        singleton_tip_state: PoolState,
+        is_pool_member: bool,
+    ):
+        if is_pool_member:
+            entry = (bytes(singleton_tip), bytes(singleton_tip_state), 1, launcher_id)
+        else:
+            entry = (bytes(singleton_tip), bytes(singleton_tip_state), 0, launcher_id)
         cursor = await self.connection.execute(
-            f"UPDATE farmer SET singleton_coin_id=?, is_pool_member=? WHERE launcher_id=?",
-            (singleton_coin_id.hex(), 1 if is_pool_member else 0, launcher_id.hex()),
+            f"UPDATE farmer SET singleton_tip=?, singleton_tip_state=?, is_pool_member=? WHERE launcher_id=?",
+            entry,
         )
         await cursor.close()
         await self.connection.commit()

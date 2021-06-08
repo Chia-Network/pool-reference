@@ -86,12 +86,18 @@ key you created in step 2. These can be obtained by doing 'chia wallet show'.
 4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `pool.py`
 file in `default_target_puzzle_hash` and `pool_fee_puzzle_hash` respectively.
    
-5. Change the pool_url in pool.py to point to your external ip or hostname.
+5. Change the pool_url in pool.py to point to your external ip or hostname. 
+   This must match exactly with what the user enters into their UI or CLI, and must start with https://. For now
+   http:// can also be used.
+   
+6. If you would like to test with smaller plots (instead of using k32s), go to the file `default_constants.py` and 
+increase POOL_SUB_SLOT_ITERS from 37600000000 to 37600000000 * (2**11). The default value with difficulty 1 (the lowest)
+   will result in 10 partials per day per k32. This makes it difficult to test due to large plots.
 
-6. Start the node using `chia start farmer`, and log in to a different key (not the two keys created for the pool). 
+7. Start the node using `chia start farmer`, and log in to a different key (not the two keys created for the pool). 
 This will be referred to as the farmer's key here. Sync up your wallet on testnet for the farmer key. 
 
-7. Create a venv (different from chia-blockchain) and start the pool server using the following commands:
+8. Create a venv (different from chia-blockchain) and start the pool server using the following commands:
 
 ```
 cd pool-reference
@@ -101,27 +107,27 @@ pip install ../chia-blockchain/
 sudo CHIA_ROOT="/your/home/dir/.chia/testnet7" ./venv/bin/python pool/pool_server.py
 ```
 
-8. You should see something like this when starting, but no errors:
+You should see something like this when starting, but no errors:
 ```
 INFO:root:Logging in: {'fingerprint': 2164248527, 'success': True}
 INFO:root:Obtaining balance: {'confirmed_wallet_balance': 0, 'max_send_amount': 0, 'pending_change': 0, 'pending_coin_removal_count': 0, 'spendable_balance': 0, 'unconfirmed_wallet_balance': 0, 'unspent_coin_count': 0, 'wallet_id': 1}
 ```
 
-9. Create a pool nft (on the farmer key) by doing `chia poolnft create -u 127.0.0.1:80`, or whatever host:port you want
-to use for your pool. Approve it and wait for transaction confirmation.
+9. Create a pool nft (on the farmer key) by doing `chia plotnft create -u http://127.0.0.1:80`, or whatever host:port you want
+to use for your pool. Approve it and wait for transaction confirmation. This url must match *exactly* with what the 
+   pool uses.
    
-10. Do `chia poolnft show` to ensure that your poolnft is created. Now start making some plots for this pool nft.
+10. Do `chia plotnft show` to ensure that your plotnft is created. Now start making some plots for this pool nft.
 You can make plots by specifying the -c argument in `chia plots create`. Make sure to *not* use the `-p` argument. The 
-    value you should use for -c is the `P2 singleton address` from `chia poolnft show` output.
+    value you should use for -c is the `P2 singleton address` from `chia plotnft show` output.
  You can start with small k25 plots and see if partials are submitted from the farmer to the pool server. The output
 will be the following in the pool if everything is working:
 ```
 INFO:root:Returning {'points_balance': 82629918227, 'current_difficulty': 1963211364}, time: 0.017535686492919922 singleton: 0x1f8dab79a614a82f9834c8f395f5fe195ae020807169b71a10218b9788a7a573
 ```
     
-Note that claiming rewards and switching pools are still not enabled, but these will be added very shortly. Please
+Note that switching pools is still not enabled, but will be added very shortly. Please
 send a message to @sorgente711 on keybase if you have questions about the 10 steps explained above. All other questions
 should be send to the #pools channel in keybase. Note that there will probably be breaking changes soon which will
-require re-plotting and re-running all the steps above. Please note that currently, a lower difficulty constant factor
-is used, so testing can be done with small plots. 
+require re-plotting and re-running all the steps above. 
 

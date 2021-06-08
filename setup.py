@@ -16,7 +16,7 @@ setup(
     version="1.2",
     author="Mariano Sorgente",
     author_email="mariano@chia.net",
-    description=("A refrence pool for the Chia blockchain."),
+    description=("A reference pool for the Chia blockchain."),
     license="Apache",
     packages=setuptools.find_packages(),
     install_requires=["wheel", "chia-blockchain", "Flask"],

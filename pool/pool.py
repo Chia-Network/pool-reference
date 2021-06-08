@@ -26,6 +26,7 @@ from chia.util.lru_cache import LRUCache
 from chia.wallet.transaction_record import TransactionRecord
 from chia.pools.pool_puzzles import (
     launcher_id_to_p2_puzzle_hash,
+    get_most_recent_singleton_coin_from_coin_solution,
 )
 
 from difficulty_adjustment import get_new_difficulty
@@ -259,9 +260,15 @@ class Pool:
 
                 for rec in farmer_records:
                     if rec.is_pool_member:
+                        singleton_tip: Optional[Coin] = get_most_recent_singleton_coin_from_coin_solution(
+                            rec.singleton_tip
+                        )
+                        if singleton_tip is None:
+                            continue
+
                         singleton_coin_record: Optional[
                             CoinRecord
-                        ] = await self.node_rpc_client.get_coin_record_by_name(rec.singleton_coin_id)
+                        ] = await self.node_rpc_client.get_coin_record_by_name(singleton_tip.name())
                         if singleton_coin_record is None:
                             continue
                         if singleton_coin_record.spent:

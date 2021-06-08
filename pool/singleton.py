@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Optional, Tuple
 import logging
 
@@ -37,63 +38,68 @@ async def get_and_validate_singleton_state_inner(
     confirmation_security_threshold: int,
     desired_state: Optional[PoolState],
 ) -> Optional[Tuple[CoinSolution, PoolState, bool, bool]]:
-    if farmer_record is None:
-        launcher_coin: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(launcher_id)
-        if launcher_coin is None:
-            log.warning(f"Can not find genesis coin {launcher_id}")
-            return None
-        if not launcher_coin.spent:
-            log.warning(f"Genesis coin {launcher_id} not spent")
-            return None
+    try:
+        await asyncio.sleep(3)
+        if farmer_record is None:
+            launcher_coin: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(launcher_id)
+            if launcher_coin is None:
+                log.warning(f"Can not find genesis coin {launcher_id}")
+                return None
+            if not launcher_coin.spent:
+                log.warning(f"Genesis coin {launcher_id} not spent")
+                return None
 
-        last_solution: Optional[CoinSolution] = await get_coin_spend(node_rpc_client, launcher_coin)
-        saved_state = solution_to_extra_data(last_solution)
-        assert last_solution is not None and saved_state is not None
-        updated = True
-    else:
-        last_solution = farmer_record.singleton_tip
-        saved_state = farmer_record.singleton_tip_state
-        updated = False
-    saved_solution = last_solution
-    last_not_none_state: PoolState = saved_state
-    assert last_solution is not None
+            last_solution: Optional[CoinSolution] = await get_coin_spend(node_rpc_client, launcher_coin)
+            saved_state = solution_to_extra_data(last_solution)
+            assert last_solution is not None and saved_state is not None
+            updated = True
+        else:
+            last_solution = farmer_record.singleton_tip
+            saved_state = farmer_record.singleton_tip_state
+            updated = False
+        saved_solution = last_solution
+        last_not_none_state: PoolState = saved_state
+        assert last_solution is not None
 
-    last_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(last_solution.coin.name())
-    assert last_coin_record is not None
+        last_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(last_solution.coin.name())
+        assert last_coin_record is not None
 
-    while True:
-        # Get next coin solution
-        next_coin: Optional[Coin] = get_most_recent_singleton_coin_from_coin_solution(last_solution)
-        if next_coin is None:
-            # This means the singleton is invalid
-            return None
-        next_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(next_coin.name())
-        assert next_coin_record is not None
+        while True:
+            # Get next coin solution
+            next_coin: Optional[Coin] = get_most_recent_singleton_coin_from_coin_solution(last_solution)
+            if next_coin is None:
+                # This means the singleton is invalid
+                return None
+            next_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(next_coin.name())
+            assert next_coin_record is not None
 
-        if not next_coin_record.spent:
-            break
+            if not next_coin_record.spent:
+                break
 
-        next_spend: Optional[CoinSolution] = await get_coin_spend(node_rpc_client, next_coin_record)
-        assert next_spend is not None
+            last_solution: Optional[CoinSolution] = await get_coin_spend(node_rpc_client, next_coin_record)
+            assert last_solution is not None
 
-        pool_state: Optional[PoolState] = solution_to_extra_data(next_spend)
+            pool_state: Optional[PoolState] = solution_to_extra_data(last_solution)
 
-        if pool_state is not None:
-            last_not_none_state = pool_state
+            if pool_state is not None:
+                last_not_none_state = pool_state
             if peak_height - confirmation_security_threshold > next_coin_record.spent_block_index:
                 # There is a state transition, and it is sufficiently buried
                 saved_solution = last_solution
-                saved_state = pool_state
+                saved_state = last_not_none_state
                 updated = True
 
-    # Validate state of the singleton
-    is_pool_member = True
-    if desired_state is not None and last_not_none_state != desired_state:
-        log.info(f"Desired: {desired_state}, got: {last_not_none_state}")
-        is_pool_member = False
+        # Validate state of the singleton
+        is_pool_member = True
+        if desired_state is not None and last_not_none_state != desired_state:
+            log.info(f"Desired: {desired_state}, got: {last_not_none_state}")
+            is_pool_member = False
 
-    log.info(f"Is pool member? {is_pool_member}")
-    return saved_solution, saved_state, updated, is_pool_member
+        log.info(f"Is pool member? {is_pool_member}")
+        return saved_solution, saved_state, updated, is_pool_member
+    except Exception as e:
+        log.error(f"Error getting singleton: {e}")
+        return None
 
 
 async def create_absorb_transaction(
@@ -103,7 +109,7 @@ async def create_absorb_transaction(
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
 ) -> SpendBundle:
-    last_solution, last_state, _, _ = get_and_validate_singleton_state_inner(
+    last_solution, last_state, _, _ = await get_and_validate_singleton_state_inner(
         node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0, None
     )
     launcher_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(

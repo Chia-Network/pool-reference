@@ -3,7 +3,7 @@ import logging
 import time
 import traceback
 from asyncio import Task
-from secrets import token_bytes
+from math import floor
 from typing import Dict, Optional, Set, List, Tuple
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
@@ -15,7 +15,7 @@ from chia.types.coin_record import CoinRecord
 from chia.types.coin_solution import CoinSolution
 from chia.util.bech32m import decode_puzzle_hash
 from chia.consensus.constants import ConsensusConstants
-from chia.util.ints import uint64, uint16, uint32, uint8
+from chia.util.ints import uint64, uint16, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.full_node.signage_point import SignagePoint
@@ -61,7 +61,7 @@ class Pool:
 
         # TODO(pool): potentially tweak these numbers for security and performance
         # This is what the user enters into the input field. This exact value will be stored on the blockchain
-        self.pool_url = "http://127.0.0.1:80"
+        self.pool_url = "http://10.0.0.45"
         self.min_difficulty = uint64(10)  # 10 difficulty is about 1 proof a day per plot
         self.default_difficulty: uint64 = uint64(10)
 
@@ -272,7 +272,8 @@ class Pool:
                         if singleton_coin_record is None:
                             continue
                         if singleton_coin_record.spent:
-                            self.log.warning(f"Singleton coin {rec.singleton_coin_id} is spent")
+                            self.log.warning(f"Singleton coin {singleton_coin_record.coin.name()} is spent, will not "
+                                             f"claim rewards")
                             continue
 
                         spend_bundle = await create_absorb_transaction(
@@ -351,33 +352,31 @@ class Pool:
                         Tuple[uint64, bytes]
                     ] = await self.store.get_farmer_points_and_payout_instructions()
                     total_points = sum([pt for (pt, ph) in points_and_ph])
-                    if total_points == 0:
-                        self.log.warning(f"No points for any farmer, waiting for {self.payment_interval} seconds")
-                        await asyncio.sleep(self.payment_interval)
-                        continue
+                    if total_points > 0:
+                        mojo_per_point = floor(amount_to_distribute / total_points)
+                        self.log.info(f"Paying out {mojo_per_point} mojo / point")
 
-                    mojo_per_point = amount_to_distribute / total_points
-                    self.log.info(f"Paying out {mojo_per_point} mojo / point")
+                        additions_sub_list: List[Dict] = [
+                            {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount}
+                        ]
+                        for points, ph in points_and_ph:
+                            additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point})
 
-                    additions_sub_list: List[Dict] = [
-                        {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount}
-                    ]
-                    for points, ph in points_and_ph:
-                        additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point})
+                            if len(additions_sub_list) == self.max_additions_per_transaction:
+                                await self.pending_payments.put(additions_sub_list.copy())
+                                self.log.info(f"Will make payments: {additions_sub_list}")
+                                additions_sub_list = []
 
-                        if len(additions_sub_list) == self.max_additions_per_transaction:
-                            await self.pending_payments.put(additions_sub_list.copy())
+                        if len(additions_sub_list) > 0:
                             self.log.info(f"Will make payments: {additions_sub_list}")
-                            additions_sub_list = []
+                            await self.pending_payments.put(additions_sub_list.copy())
 
-                    if len(additions_sub_list) > 0:
-                        self.log.info(f"Will make payments: {additions_sub_list}")
-                        await self.pending_payments.put(additions_sub_list.copy())
+                        # Subtract the points from each farmer
+                        await self.store.clear_farmer_points()
+                    else:
+                        self.log.info(f"No points for any farmer. Waiting {self.payment_interval}")
 
-                    # Subtract the points from each farmer
-                    await self.store.clear_farmer_points()
-
-                await asyncio.sleep(self.payment_interval)
+                await asyncio.sleep(60)
             except asyncio.CancelledError:
                 self.log.info("Cancelled create_payments_loop, closing")
                 return
@@ -402,13 +401,15 @@ class Pool:
 
                 # TODO(pool): make sure you have enough to pay the blockchain fee, this will be taken out of the pool
                 # fee itself. Alternatively you can set it to 0 and wait longer
-                blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
+                # blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
+                blockchain_fee = 0
                 try:
                     transaction: TransactionRecord = await self.wallet_rpc_client.send_transaction_multi(
                         self.wallet_id, payment_targets, fee=blockchain_fee
                     )
                 except ValueError as e:
                     self.log.error(f"Error making payment: {e}")
+                    await asyncio.sleep(10)
                     await self.pending_payments.put(payment_targets)
                     continue
 
@@ -427,7 +428,7 @@ class Pool:
                         self.log.info(f"Not confirmed. In mempool? {transaction.is_in_mempool()}")
                     else:
                         self.log.info(f"Confirmations: {peak_height - transaction.confirmed_at_height}")
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(10)
 
                 # TODO(pool): persist in DB
                 self.log.info(f"Successfully confirmed payments {payment_targets}")
@@ -491,10 +492,12 @@ class Pool:
             ] = await self.get_and_validate_singleton_state(partial)
 
             if singleton_state_tuple is None:
+                self.log.info("Singleton state is None.")
                 # This singleton doesn't exist, or isn't assigned to our pool
                 return
             last_spend, last_state = singleton_state_tuple
             if last_state.state == PoolSingletonState.LEAVING_POOL.value:
+                self.log.info("Leaving pool, so no rewards")
                 # Don't give rewards while escaping from the pool
                 return
 
@@ -613,7 +616,7 @@ class Pool:
 
         optional_result: Optional[Tuple[CoinSolution, PoolState, bool, bool]] = await singleton_task
         if remove_after and partial.payload.launcher_id in self.follow_singleton_tasks:
-            self.follow_singleton_tasks.pop(partial.payload.launcher_id)
+            await self.follow_singleton_tasks.pop(partial.payload.launcher_id)
 
         if optional_result is None:
             return None
@@ -623,6 +626,7 @@ class Pool:
             # This means the singleton has been changed in the blockchain (either by us or someone else). We
             # still keep track of this singleton if the farmer has changed to a different pool, in case they
             # switch back.
+            self.log.info(f"Updating singleton state for {partial.payload.launcher_id}")
             await self.store.update_singleton(
                 partial.payload.launcher_id, singleton_tip, singleton_tip_state, is_pool_member
             )

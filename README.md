@@ -81,7 +81,7 @@ directory next to (not inside) `chia-blockchain`. Make sure to be on testnet by 
 which will receive the pool fee that is kept by the pool.
 
 3. Change the `wallet_fingerprint` and `wallet_id` in the `pool.py` constructor, using the information from the first
-key you created in step 2. These can be obtained by doing 'chia wallet show'.
+key you created in step 2. These can be obtained by doing `chia wallet show`.
 
 4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `pool.py`
 file in `default_target_puzzle_hash` and `pool_fee_puzzle_hash` respectively.

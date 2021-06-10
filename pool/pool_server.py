@@ -74,7 +74,7 @@ class PoolServer:
         )
         return obj_to_response(res)
 
-    async def submit_partial(self, request_obj) -> web.Response:
+    async def post_partial(self, request_obj) -> web.Response:
         start_time = time.time()
         request = await request_obj.json()
         # TODO(pool): add rate limiting
@@ -133,7 +133,7 @@ async def start_pool_server():
         [
             web.get("/", server.wrap_http_handler(server.index)),
             web.get("/pool_info", server.wrap_http_handler(server.get_pool_info)),
-            web.post("/partial", server.wrap_http_handler(server.submit_partial)),
+            web.post("/partial", server.wrap_http_handler(server.post_partial)),
         ]
     )
     runner = aiohttp.web.AppRunner(app, access_log=None)

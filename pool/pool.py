@@ -334,12 +334,12 @@ class Pool:
                     self.default_target_puzzle_hash, include_spent_coins=False
                 )
 
-                if len(coins_records) == 0:
+                if len(coin_records) == 0:
                     self.log.info("No funds to distribute.")
                     await asyncio.sleep(120)
                     continue
 
-                total_amount_claimed = sum([c.coin.amount for c in coins_records])
+                total_amount_claimed = sum([c.coin.amount for c in coin_records])
                 pool_coin_amount = int(total_amount_claimed * self.pool_fee)
                 amount_to_distribute = total_amount_claimed - pool_coin_amount
 

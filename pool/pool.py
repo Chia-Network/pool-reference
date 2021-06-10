@@ -376,7 +376,7 @@ class Pool:
                     else:
                         self.log.info(f"No points for any farmer. Waiting {self.payment_interval}")
 
-                await asyncio.sleep(60)
+                await asyncio.sleep(self.payment_interval)
             except asyncio.CancelledError:
                 self.log.info("Cancelled create_payments_loop, closing")
                 return

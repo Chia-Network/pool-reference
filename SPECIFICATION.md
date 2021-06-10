@@ -166,10 +166,16 @@ A request from the farmer to update the difficulty. Can be ignored or respected 
 be respected if the authentication public key is the most recent one seen for this farmer.
 
 #### signature
-This is a BLS signature signed by the private key of the `owner_public_key` using the Augmented Scheme in the
-BLS IETF spec. The message must be the `payload` object in streamable format.
+This is a BLS signature of the following message:
 
-A payload must be completely rejected if the BLS signature does not validate.
+```
+[dict(payload), uint32(authentication_token)]
+```
+
+signed by the private key of the `owner_public_key` using the Augmented Scheme in the BLS IETF spec.
+
+See [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
 
 ## PUT /farmer
 Allows farmers to update their information on the pool.
@@ -281,9 +287,19 @@ check a few minutes after processing the partial, that it has not been reverted 
 If true, the sp_hash encodes the challenge_hash of the sub slot.
 
 #### aggregate_signature
-This is a 2/2 BLS aggregate signature using the Augmented Scheme in the BLS IETF spec.
-1. Message: `payload` in streamable format, public key: `plot_public_key`
-2. Message: `payload` in streamable format, public key: `authentication_public_key`
+This is a 2/2 BLS signature of the following message:
+
+```
+[dict(`payload`), uint32(`authentication_token`)]
+```
+
+signed by the private keys of the following keys:
+
+1. `plot_public_key`
+2. `authentication_public_key`
+
+using the Augmented Scheme in the BLS IETF spec. See [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
 
 A partial must be completely rejected if the BLS signature does not validate.
 

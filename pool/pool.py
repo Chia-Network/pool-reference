@@ -297,7 +297,8 @@ class Pool:
             except Exception as e:
                 error_stack = traceback.format_exc()
                 self.log.error(f"Unexpected error in collect_pool_rewards_loop: {e} {error_stack}")
-                await asyncio.sleep(self.collect_pool_rewards_interval)
+            
+            await asyncio.sleep(self.collect_pool_rewards_interval)
 
     async def create_payment_loop(self):
         """
@@ -383,7 +384,8 @@ class Pool:
             except Exception as e:
                 error_stack = traceback.format_exc()
                 self.log.error(f"Unexpected error in create_payments_loop: {e} {error_stack}")
-                await asyncio.sleep(self.payment_interval)
+            
+            await asyncio.sleep(self.payment_interval)
 
     async def submit_payment_loop(self):
         while True:

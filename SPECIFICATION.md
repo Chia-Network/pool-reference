@@ -38,6 +38,7 @@ but must be running with TLS enabled (using a CA approved certificate), and with
 All bytes values are encoded as hex with optional 0x in front. Clients are also expected to run with pipelining.
 
 - [GET /pool_info](#get-pool_info)
+- [GET /farmer](#get-farmer)
 - [POST /farmer](#post-farmer)
 - [PUT /farmer](#put-farmer)
 - [POST /partial](#post-partial)
@@ -118,6 +119,46 @@ This is the target of where rewards will be sent to from the singleton. Controll
 
 #### authentication_token_timeout
 The time in minutes for a `authentication_token` to be valid, see [Farmer authentication](#farmer-authentication).
+
+## GET /farmer
+Allows to get the latest information for a farmer.
+
+Request parameter:
+```
+- launcher_id
+- signature
+```
+
+Example request:
+```
+https://poolurl.com/farmer/launcher_id=:launcher_id&signature=:signature
+```
+
+Successful response:
+```json
+{
+    "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
+    "payout_instructions": "0xc2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
+    "difficulty": 10,
+    "points": 10
+}
+```
+
+### Parameter
+#### launcher_id
+The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
+
+#### signature
+This is a BLS signature of the following message:
+
+```
+[bytes32(launcher_id), uint32(authentication_token)]
+```
+
+signed by the private key of the `owner_public_key` using the Augmented Scheme in the BLS IETF spec.
+
+See [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
 
 ## POST /farmer
 Allows farmers to make them known by the pool. This is required once before submitting the first partial.

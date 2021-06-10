@@ -3,7 +3,7 @@ pool_info:
   name: The Reference Pool
   logo_url: https://www.chia.net/img/chia_logo.svg
   description: (example) The Reference Pool allows you to pool with low fees, paying out daily using Chia.
-pool_fee: 0.1
+pool_fee: 0.01
 pool_url: http://10.0.0.45
 min_difficulty: 10
 default_difficulty: 10

@@ -8,7 +8,7 @@ import aiohttp
 from blspy import AugSchemeMPL, PrivateKey
 from aiohttp import web
 from chia.pools.pool_wallet_info import POOL_PROTOCOL_VERSION
-from chia.protocols.pool_protocol import SubmitPartial, PoolInfo
+from chia.protocols.pool_protocol import PostPartialRequest, GetPoolInfoResponse
 from chia.util.hash import std_hash
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.consensus.constants import ConsensusConstants
@@ -62,7 +62,7 @@ class PoolServer:
         return web.Response(text="Chia reference pool")
 
     async def get_pool_info(self, _) -> web.Response:
-        res: PoolInfo = PoolInfo(
+        res: GetPoolInfoResponse = GetPoolInfoResponse(
             self.pool.info_name,
             self.pool.info_logo_url,
             uint64(self.pool.min_difficulty),
@@ -78,7 +78,7 @@ class PoolServer:
         start_time = time.time()
         request = await request_obj.json()
         # TODO(pool): add rate limiting
-        partial: SubmitPartial = SubmitPartial.from_json_dict(request)
+        partial: PostPartialRequest = PostPartialRequest.from_json_dict(request)
         time_received_partial = uint64(int(time.time()))
 
         # It's important that on the first request from this farmer, the default difficulty is used. Changing the

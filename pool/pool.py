@@ -10,7 +10,7 @@ import os, yaml
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
 from chia.pools.pool_wallet_info import PoolState, PoolSingletonState, POOL_PROTOCOL_VERSION
-from chia.protocols.pool_protocol import SubmitPartial
+from chia.protocols.pool_protocol import PostPartialRequest
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.coin_record import CoinRecord
@@ -465,7 +465,7 @@ class Pool:
             except Exception as e:
                 self.log.error(f"Unexpected error: {e}")
 
-    async def check_and_confirm_partial(self, partial: SubmitPartial, points_received: uint64) -> None:
+    async def check_and_confirm_partial(self, partial: PostPartialRequest, points_received: uint64) -> None:
         try:
             # TODO(pool): these lookups to the full node are not efficient and can be cached, especially for
             #  scaling to many users
@@ -573,7 +573,7 @@ class Pool:
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
 
     async def get_and_validate_singleton_state(
-        self, partial: SubmitPartial
+        self, partial: PostPartialRequest
     ) -> Optional[Tuple[CoinSolution, PoolState]]:
         """
         :return: the state of the singleton, if it currently exists in the blockchain, and if it is assigned to
@@ -639,7 +639,7 @@ class Pool:
 
     async def process_partial(
         self,
-        partial: SubmitPartial,
+        partial: PostPartialRequest,
         time_received_partial: uint64,
         balance: uint64,
         current_difficulty: uint64,

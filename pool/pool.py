@@ -114,16 +114,16 @@ class Pool:
         self.scan_p2_singleton_puzzle_hashes: Set[bytes32] = set()
 
         # Don't scan anything before this height, for efficiency (for example pool start date)
-        self.scan_start_height: uint32 = uint32(pool_config["partial_confirmation_delay"])
+        self.scan_start_height: uint32 = uint32(pool_config["scan_start_height"])
 
         # Interval for scanning and collecting the pool rewards
-        self.collect_pool_rewards_interval = pool_config["partial_confirmation_delay"]
+        self.collect_pool_rewards_interval = pool_config["collect_pool_rewards_interval"]
 
         # After this many confirmations, a transaction is considered final and irreversible
         self.confirmation_security_threshold = pool_config["confirmation_security_threshold"]
 
         # Interval for making payout transactions to farmers
-        self.payment_interval = pool_config["confirmation_security_threshold"]
+        self.payment_interval = pool_config["payment_interval"]
 
         # We will not make transactions with more targets than this, to ensure our transaction gets into the blockchain
         # faster.

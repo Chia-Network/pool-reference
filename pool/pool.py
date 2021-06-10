@@ -334,22 +334,12 @@ class Pool:
                     self.default_target_puzzle_hash, include_spent_coins=False
                 )
 
-                coins_to_distribute: List[Coin] = []
-                for coin_record in coin_records:
-                    assert not coin_record.spent
-                    if (
-                        coin_record.spent_block_index
-                        > self.blockchain_state["peak"].height - self.confirmation_security_threshold
-                    ):
-                        continue
-                    coins_to_distribute.append(coin_record.coin)
-
-                if len(coins_to_distribute) == 0:
+                if len(coins_records) == 0:
                     self.log.info("No funds to distribute.")
                     await asyncio.sleep(120)
                     continue
 
-                total_amount_claimed = sum([c.amount for c in coins_to_distribute])
+                total_amount_claimed = sum([c.coin.amount for c in coins_records])
                 pool_coin_amount = int(total_amount_claimed * self.pool_fee)
                 amount_to_distribute = total_amount_claimed - pool_coin_amount
 

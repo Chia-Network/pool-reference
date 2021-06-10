@@ -67,9 +67,8 @@ The following errors may occur:
 | 0x09 | Invalid puzzle hash|
 | 0x0A | Farmer not known |
 | 0x0B | Farmer already known |
-| 0x0C | Invalid owner public key |
-| 0x0D | Invalid authentication public key |
-| 0x0E | Invalid payout instructions |
+| 0x0C | Invalid authentication public key |
+| 0x0D | Invalid payout instructions |
 
 ## GET /pool_info
 
@@ -128,7 +127,6 @@ Request:
 {
     "payload": {
         "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
-        "owner_public_key": "0x84c3fcf9d5581c1ddc702cb0f3b4a06043303b334dd993ab42b2c320ebfa98e5ce558448615b3f69638ba92cf7f43da5",
         "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
         "payout_instructions": "0xc2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
         "suggested_difficulty": 10
@@ -148,11 +146,6 @@ The successful response must always contain a welcome message which must be defi
 
 #### payload.launcher_id
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
-
-#### payload.owner_public_key
-The current owner public key of the farmer's singleton in BLS G1 format. This can change on the blockchain, but the
-initial implementation does not change it. It is used to transfer ownership of plots or singletons. The pool must check
-that the current incarnation of the singleton matches this value.
 
 #### payload.authentication_public_key
 The public key of the authentication key, which is is a temporary key used by the farmer to sign all of their requests

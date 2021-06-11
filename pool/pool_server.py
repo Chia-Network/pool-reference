@@ -8,17 +8,18 @@ import aiohttp
 from blspy import AugSchemeMPL, PrivateKey
 from aiohttp import web
 from chia.pools.pool_wallet_info import POOL_PROTOCOL_VERSION
-from chia.protocols.pool_protocol import PoolErrorCode, PostPartialRequest, GetPoolInfoResponse
+from chia.protocols.pool_protocol import ErrorResponse, PoolErrorCode, PostPartialRequest, GetPoolInfoResponse
 from chia.util.hash import std_hash
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.consensus.constants import ConsensusConstants
 from chia.util.json_util import obj_to_response
-from chia.util.ints import uint64, uint32
+from chia.util.ints import uint16, uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 
 from store import FarmerRecord
 from pool import Pool
+from util import error_response
 
 
 def allow_cors(response: web.Response) -> web.Response:
@@ -48,11 +49,11 @@ class PoolServer:
                 tb = traceback.format_exc()
                 self.log.warning(f"Error while handling message: {tb}")
                 if len(e.args) > 0:
-                    res_object = {"error_code": PoolErrorCode.SERVER_EXCEPTION.value, "error_message": f"{e.args[0]}"}
+                    res_error = error_response(PoolErrorCode.SERVER_EXCEPTION, f"{e.args[0]}")
                 else:
-                    res_object = {"error_code": PoolErrorCode.SERVER_EXCEPTION.value, "error_message": f"{e}"}
+                    res_error = error_response(PoolErrorCode.SERVER_EXCEPTION, f"{e}")
+                return allow_cors(res_error)
 
-                return allow_cors(obj_to_response(res_object))
             return allow_cors(res_object)
 
         return inner

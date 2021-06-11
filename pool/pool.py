@@ -34,6 +34,7 @@ from chia.pools.pool_puzzles import (
 from difficulty_adjustment import get_new_difficulty
 from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
 from store import FarmerRecord, PoolStore
+from util import error_response
 
 
 class Pool:
@@ -645,10 +646,10 @@ class Pool:
         can_update_difficulty: bool,
     ) -> Dict:
         if partial.payload.suggested_difficulty < self.min_difficulty:
-            return {
-                "error_code": PoolErrorCode.INVALID_DIFFICULTY.value,
-                "error_message": f"Invalid difficulty {partial.payload.suggested_difficulty}. minimum: {self.min_difficulty} ",
-            }
+            return error_response(
+                PoolErrorCode.INVALID_DIFFICULTY,
+                f"Invalid difficulty {partial.payload.suggested_difficulty}. minimum: {self.min_difficulty} ",
+            )
 
         # Validate signatures
         pk1: G1Element = partial.payload.owner_public_key
@@ -660,17 +661,15 @@ class Pool:
             [pk1, pk2, pk3], [m1, m2, m2], partial.auth_key_and_partial_aggregate_signature
         )
         if not valid_sig:
-            return {
-                "error_code": PoolErrorCode.INVALID_SIGNATURE.value,
-                "error_message": f"The aggregate signature is invalid {partial.auth_key_and_partial_aggregate_signature}",
-            }
+            return error_response(
+                PoolErrorCode.INVALID_SIGNATURE,
+                f"The aggregate signature is invalid {partial.auth_key_and_partial_aggregate_signature}",
+            )
 
         # TODO (chia-dev): Check DB p2_singleton_puzzle_hash and compare
         # if partial.payload.proof_of_space.pool_contract_puzzle_hash != p2_singleton_puzzle_hash:
-        #     return {
-        #         "error_code": PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
-        #         "error_message": f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}",
-        #     }
+        #     return error_response(PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH,
+        #                           f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}")
 
         if partial.payload.end_of_sub_slot:
             response = await self.node_rpc_client.get_recent_signage_point_or_eos(None, partial.payload.sp_hash)
@@ -678,23 +677,22 @@ class Pool:
             response = await self.node_rpc_client.get_recent_signage_point_or_eos(partial.payload.sp_hash, None)
 
         if response is None or response["reverted"]:
-            return {
-                "error_code": PoolErrorCode.NOT_FOUND.value,
-                "error_message": f"Did not find signage point or EOS {partial.payload.sp_hash}, {response}",
-            }
+            return error_response(
+                PoolErrorCode.NOT_FOUND, f"Did not find signage point or EOS {partial.payload.sp_hash}, {response}"
+            )
         node_time_received_sp = response["time_received"]
 
         signage_point: Optional[SignagePoint] = response.get("signage_point", None)
         end_of_sub_slot: Optional[EndOfSubSlotBundle] = response.get("eos", None)
 
         if time_received_partial - node_time_received_sp > self.partial_time_limit:
-            return {
-                "error_code": PoolErrorCode.TOO_LATE.value,
-                "error_message": f"Received partial in {time_received_partial - node_time_received_sp}. "
-                f"Make sure your proof of space lookups are fast, and network connectivity is good. Response "
-                f"must happen in less than {self.partial_time_limit} seconds. NAS or networking farming can be an "
-                f"issue",
-            }
+            return error_response(
+                PoolErrorCode.TOO_LATE,
+                f"Received partial in {time_received_partial - node_time_received_sp}. "
+                f"Make sure your proof of space lookups are fast, and network connectivity is good."
+                f"Response must happen in less than {self.partial_time_limit} seconds. NAS or network"
+                f" farming can be an issue",
+            )
 
         # Validate the proof
         if signage_point is not None:
@@ -706,10 +704,7 @@ class Pool:
             self.constants, challenge_hash, partial.payload.sp_hash
         )
         if quality_string is None:
-            return {
-                "error_code": PoolErrorCode.INVALID_PROOF.value,
-                "error_message": f"Invalid proof of space {partial.payload.sp_hash}",
-            }
+            return error_response(PoolErrorCode.INVALID_PROOF, f"Invalid proof of space {partial.payload.sp_hash}")
 
         required_iters: uint64 = calculate_iterations_quality(
             self.constants.DIFFICULTY_CONSTANT_FACTOR,
@@ -720,12 +715,10 @@ class Pool:
         )
 
         if required_iters >= self.iters_limit:
-            return {
-                "error_code": PoolErrorCode.PROOF_NOT_GOOD_ENOUGH.value,
-                "error_message": f"Proof of space has required iters {required_iters}, too high for difficulty "
-                f"{current_difficulty}",
-                "current_difficulty": current_difficulty,
-            }
+            return error_response(
+                PoolErrorCode.PROOF_NOT_GOOD_ENOUGH,
+                f"Proof of space has required iters {required_iters}, too high for difficulty " f"{current_difficulty}",
+            )
 
         await self.pending_point_partials.put((partial, time_received_partial, current_difficulty))
 

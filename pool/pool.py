@@ -474,10 +474,10 @@ class Pool:
                     plot_records: Optional[PlotRecord] = await self.store.get_plot_records(farmer.launcher_id)
                     for plot in plot_records:
                     
-                        # This is our net space calculation based on 0.000762*k*2^k
-                        kb_estimation = (0.000762*plot.plot_size) * pow(2, plot.plot_size)
-                        total_size += kb_estimation/1000000;
-                        #self.log.info(f"Farmer {farmer.launcher_id} -- k{plot.plot_size} plot -- {round(kb_estimation,3)} kib -- {round((kb_estimation/1000000),3)} gib")
+                        # This is our net space calculation based on 0.000777*k*2^k
+                        kb_estimation = (0.000777*plot.plot_size) * pow(2, plot.plot_size)
+                        total_size += kb_estimation/1024/1024;
+                        #self.log.info(f"Farmer {farmer.launcher_id} -- k{plot.plot_size} plot -- {round(kb_estimation,3)} kib -- {round((kb_estimation/1024/1024),3)} gib")
                         
                     total_plots+=len(plot_records);
 

@@ -8,7 +8,7 @@ import aiohttp
 from blspy import AugSchemeMPL, PrivateKey
 from aiohttp import web
 from chia.pools.pool_wallet_info import POOL_PROTOCOL_VERSION
-from chia.protocols.pool_protocol import PostPartialRequest, GetPoolInfoResponse
+from chia.protocols.pool_protocol import PoolErrorCode, PostPartialRequest, GetPoolInfoResponse
 from chia.util.hash import std_hash
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.consensus.constants import ConsensusConstants
@@ -17,7 +17,6 @@ from chia.util.ints import uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 
-from error_codes import PoolErr
 from store import FarmerRecord
 from pool import Pool
 
@@ -49,9 +48,9 @@ class PoolServer:
                 tb = traceback.format_exc()
                 self.log.warning(f"Error while handling message: {tb}")
                 if len(e.args) > 0:
-                    res_object = {"error_code": PoolErr.SERVER_EXCEPTION.value, "error_message": f"{e.args[0]}"}
+                    res_object = {"error_code": PoolErrorCode.SERVER_EXCEPTION.value, "error_message": f"{e.args[0]}"}
                 else:
-                    res_object = {"error_code": PoolErr.SERVER_EXCEPTION.value, "error_message": f"{e}"}
+                    res_object = {"error_code": PoolErrorCode.SERVER_EXCEPTION.value, "error_message": f"{e}"}
 
                 return allow_cors(obj_to_response(res_object))
             return allow_cors(res_object)
@@ -100,7 +99,7 @@ class PoolServer:
 
         res_dict = await self.pool.process_partial(partial, time_received_partial, balance, current_difficulty, True)
 
-        if "error_code" in res_dict and "error_code" == PoolErr.NOT_FOUND.value:
+        if "error_code" in res_dict and "error_code" == PoolErrorCode.NOT_FOUND.value:
             asyncio.create_task(
                 await_and_call(
                     self.pool.process_partial, partial, time_received_partial, balance, current_difficulty, False

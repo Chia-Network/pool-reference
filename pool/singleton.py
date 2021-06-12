@@ -39,7 +39,6 @@ async def get_and_validate_singleton_state_inner(
     desired_state: Optional[PoolState],
 ) -> Optional[Tuple[CoinSolution, PoolState, bool, bool]]:
     try:
-        await asyncio.sleep(3)
         if farmer_record is None:
             launcher_coin: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(launcher_id)
             if launcher_coin is None:

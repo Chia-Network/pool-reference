@@ -10,7 +10,7 @@ import os, yaml
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
 from chia.pools.pool_wallet_info import PoolState, PoolSingletonState, POOL_PROTOCOL_VERSION
-from chia.protocols.pool_protocol import PostPartialRequest
+from chia.protocols.pool_protocol import PoolErrorCode, PostPartialRequest
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.coin_record import CoinRecord
@@ -32,7 +32,6 @@ from chia.pools.pool_puzzles import (
 )
 
 from difficulty_adjustment import get_new_difficulty
-from error_codes import PoolErr
 from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
 from store import FarmerRecord, PoolStore
 
@@ -647,7 +646,7 @@ class Pool:
     ) -> Dict:
         if partial.payload.suggested_difficulty < self.min_difficulty:
             return {
-                "error_code": PoolErr.INVALID_DIFFICULTY.value,
+                "error_code": PoolErrorCode.INVALID_DIFFICULTY.value,
                 "error_message": f"Invalid difficulty {partial.payload.suggested_difficulty}. minimum: {self.min_difficulty} ",
             }
 
@@ -662,14 +661,14 @@ class Pool:
         )
         if not valid_sig:
             return {
-                "error_code": PoolErr.INVALID_SIGNATURE.value,
+                "error_code": PoolErrorCode.INVALID_SIGNATURE.value,
                 "error_message": f"The aggregate signature is invalid {partial.auth_key_and_partial_aggregate_signature}",
             }
 
         # TODO (chia-dev): Check DB p2_singleton_puzzle_hash and compare
         # if partial.payload.proof_of_space.pool_contract_puzzle_hash != p2_singleton_puzzle_hash:
         #     return {
-        #         "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
+        #         "error_code": PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
         #         "error_message": f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}",
         #     }
 
@@ -680,7 +679,7 @@ class Pool:
 
         if response is None or response["reverted"]:
             return {
-                "error_code": PoolErr.NOT_FOUND.value,
+                "error_code": PoolErrorCode.NOT_FOUND.value,
                 "error_message": f"Did not find signage point or EOS {partial.payload.sp_hash}, {response}",
             }
         node_time_received_sp = response["time_received"]
@@ -690,7 +689,7 @@ class Pool:
 
         if time_received_partial - node_time_received_sp > self.partial_time_limit:
             return {
-                "error_code": PoolErr.TOO_LATE.value,
+                "error_code": PoolErrorCode.TOO_LATE.value,
                 "error_message": f"Received partial in {time_received_partial - node_time_received_sp}. "
                 f"Make sure your proof of space lookups are fast, and network connectivity is good. Response "
                 f"must happen in less than {self.partial_time_limit} seconds. NAS or networking farming can be an "
@@ -708,7 +707,7 @@ class Pool:
         )
         if quality_string is None:
             return {
-                "error_code": PoolErr.INVALID_PROOF.value,
+                "error_code": PoolErrorCode.INVALID_PROOF.value,
                 "error_message": f"Invalid proof of space {partial.payload.sp_hash}",
             }
 
@@ -722,7 +721,7 @@ class Pool:
 
         if required_iters >= self.iters_limit:
             return {
-                "error_code": PoolErr.PROOF_NOT_GOOD_ENOUGH.value,
+                "error_code": PoolErrorCode.PROOF_NOT_GOOD_ENOUGH.value,
                 "error_message": f"Proof of space has required iters {required_iters}, too high for difficulty "
                 f"{current_difficulty}",
                 "current_difficulty": current_difficulty,

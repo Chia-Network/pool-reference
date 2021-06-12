@@ -666,13 +666,12 @@ class Pool:
                 "error_message": f"The aggregate signature is invalid {partial.auth_key_and_partial_aggregate_signature}",
             }
 
-        if partial.payload.proof_of_space.pool_contract_puzzle_hash != launcher_id_to_p2_puzzle_hash(
-            partial.payload.launcher_id
-        ):
-            return {
-                "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
-                "error_message": f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}",
-            }
+        # TODO (chia-dev): Check DB p2_singleton_puzzle_hash and compare
+        # if partial.payload.proof_of_space.pool_contract_puzzle_hash != p2_singleton_puzzle_hash:
+        #     return {
+        #         "error_code": PoolErr.INVALID_P2_SINGLETON_PUZZLE_HASH.value,
+        #         "error_message": f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}",
+        #     }
 
         if partial.payload.end_of_sub_slot:
             response = await self.node_rpc_client.get_recent_signage_point_or_eos(None, partial.payload.sp_hash)

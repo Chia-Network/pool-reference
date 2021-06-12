@@ -24,7 +24,7 @@ class FarmerRecord(Streamable):
     singleton_tip_state: PoolState  # Current state of the singleton
     points: uint64  # Total points accumulated since last rest (or payout)
     difficulty: uint64  # Current difficulty for this farmer
-    pool_payout_instructions: str  # This is where the pool will pay out rewards to the farmer
+    payout_instructions: str  # This is where the pool will pay out rewards to the farmer
     is_pool_member: bool  # If the farmer leaves the pool, this gets set to False
 
 
@@ -51,7 +51,7 @@ class PoolStore:
                 " singleton_tip_state blob,"
                 " points bigint,"
                 " difficulty bigint,"
-                " pool_payout_instructions text,"
+                " payout_instructions text,"
                 " is_pool_member tinyint)"
             )
         )
@@ -95,7 +95,7 @@ class PoolStore:
                 bytes(farmer_record.singleton_tip_state),
                 farmer_record.points,
                 farmer_record.difficulty,
-                farmer_record.pool_payout_instructions,
+                farmer_record.payout_instructions,
                 int(farmer_record.is_pool_member),
             ),
         )
@@ -159,7 +159,7 @@ class PoolStore:
         return [self._row_to_farmer_record(row) for row in rows]
 
     async def get_farmer_points_and_payout_instructions(self) -> List[Tuple[uint64, bytes]]:
-        cursor = await self.connection.execute(f"SELECT points, pool_payout_instructions from farmer")
+        cursor = await self.connection.execute(f"SELECT points, payout_instructions from farmer")
         rows = await cursor.fetchall()
         accumulated: Dict[bytes32, uint64] = {}
         for row in rows:

@@ -511,7 +511,6 @@ class Pool:
                         partial.payload.launcher_id,
                         partial.payload.proof_of_space.pool_contract_puzzle_hash,
                         partial.payload.authentication_key_info.authentication_public_key,
-                        partial.payload.authentication_key_info.authentication_public_key_timestamp,
                         last_spend,
                         last_state,
                         points_received,
@@ -531,31 +530,16 @@ class Pool:
                     )
 
                     new_payout_instructions: str = farmer_record.payout_instructions
-                    new_authentication_pk: G1Element = farmer_record.authentication_public_key
-                    new_authentication_pk_timestamp: uint64 = farmer_record.authentication_public_key_timestamp
                     if farmer_record.payout_instructions != partial.payload.payout_instructions:
-                        # Only allow changing payout instructions if we have the latest authentication public key
-                        if (
-                            farmer_record.authentication_public_key_timestamp
-                            <= partial.payload.authentication_key_info.authentication_public_key_timestamp
-                        ):
-                            # This means the authentication key being used is at least as new as the one in the DB
-                            self.log.info(
-                                f"Farmer changing rewards target to {partial.payload.payout_instructions}"
-                            )
-                            new_payout_instructions = partial.payload.payout_instructions
-                            new_authentication_pk = partial.payload.authentication_key_info.authentication_public_key
-                            new_authentication_pk_timestamp = (
-                                partial.payload.authentication_key_info.authentication_public_key_timestamp
-                            )
-                        else:
-                            # This means the timestamp in DB is new
-                            self.log.info("Not changing pool payout instructions, don't have newest authentication key")
+                        # This means the authentication key being used is at least as new as the one in the DB
+                        self.log.info(
+                            f"Farmer changing rewards target to {partial.payload.payout_instructions}"
+                        )
+                        new_payout_instructions = partial.payload.payout_instructions
                     farmer_record = FarmerRecord(
                         partial.payload.launcher_id,
                         partial.payload.proof_of_space.pool_contract_puzzle_hash,
-                        new_authentication_pk,
-                        new_authentication_pk_timestamp,
+                        farmer_record.authentication_public_key,
                         last_spend,
                         last_state,
                         uint64(farmer_record.points + points_received),
@@ -742,12 +726,7 @@ class Pool:
                         self.min_difficulty,
                     )
 
-                    # Only allow changing difficulty if we have the latest authentication public key
-                    if (
-                        current_difficulty != new_difficulty
-                        and farmer_record.authentication_public_key_timestamp
-                        <= partial.payload.authentication_key_info.authentication_public_key_timestamp
-                    ):
+                    if current_difficulty != new_difficulty:
                         await self.store.update_difficulty(partial.payload.launcher_id, new_difficulty)
                         return {"points_balance": balance, "current_difficulty": new_difficulty}
 

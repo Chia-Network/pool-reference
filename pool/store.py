@@ -19,7 +19,6 @@ class FarmerRecord(Streamable):
     launcher_id: bytes32  # This uniquely identifies the singleton on the blockchain (ID for this farmer)
     p2_singleton_puzzle_hash: bytes32  # Derived from the launcher id
     authentication_public_key: G1Element  # This is the latest public key of the farmer (signs all partials)
-    authentication_public_key_timestamp: uint64  # The timestamp of approval of the latest public key, by the owner key
     singleton_tip: CoinSolution  # Last coin solution that is buried in the blockchain, for this singleton
     singleton_tip_state: PoolState  # Current state of the singleton
     points: uint64  # Total points accumulated since last rest (or payout)
@@ -46,7 +45,6 @@ class PoolStore:
                 "launcher_id text PRIMARY KEY,"
                 " p2_singleton_puzzle_hash text,"
                 " authentication_public_key text,"
-                " authentication_public_key_timestamp bigint,"
                 " singleton_tip blob,"
                 " singleton_tip_state blob,"
                 " points bigint,"
@@ -74,23 +72,21 @@ class PoolStore:
             bytes.fromhex(row[0]),
             bytes.fromhex(row[1]),
             G1Element.from_bytes(bytes.fromhex(row[2])),
-            row[3],
-            CoinSolution.from_bytes(row[4]),
-            PoolState.from_bytes(row[5]),
+            CoinSolution.from_bytes(row[3]),
+            PoolState.from_bytes(row[4]),
+            row[5],
             row[6],
             row[7],
-            row[8],
-            True if row[9] == 1 else False,
+            True if row[8] == 1 else False,
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord):
         cursor = await self.connection.execute(
-            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 farmer_record.launcher_id.hex(),
                 farmer_record.p2_singleton_puzzle_hash.hex(),
                 bytes(farmer_record.authentication_public_key).hex(),
-                farmer_record.authentication_public_key_timestamp,
                 bytes(farmer_record.singleton_tip),
                 bytes(farmer_record.singleton_tip_state),
                 farmer_record.points,

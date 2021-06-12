@@ -27,6 +27,13 @@ class FarmerRecord(Streamable):
     pool_payout_instructions: str  # This is where the pool will pay out rewards to the farmer
     is_pool_member: bool  # If the farmer leaves the pool, this gets set to False
 
+@dataclass(frozen=True)
+@streamable
+class PlotRecord(Streamable):
+    launcher_id: bytes32  # This is the ID for the farmer
+    plot_id: G1Element  # This is the unique ID or hash of the plot
+    plot_size: uint64  # This is the size of the plot
+    timestamp: uint64  # The timestamp of the plot (refreshed with every valid partial submission)
 
 class PoolStore:
     connection: aiosqlite.Connection
@@ -59,6 +66,10 @@ class PoolStore:
         await self.connection.execute(
             "CREATE TABLE IF NOT EXISTS partial(launcher_id text, timestamp bigint, difficulty bigint)"
         )
+        
+        await self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS plots(launcher_id text, plot_id text, plot_size bigint, timestamp bigint)"
+        )
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
@@ -81,6 +92,15 @@ class PoolStore:
             row[7],
             row[8],
             True if row[9] == 1 else False,
+        )
+        
+    @staticmethod
+    def _row_to_plot_record(row) -> PlotRecord:
+        return PlotRecord(
+            bytes.fromhex(row[0]),
+            bytes.fromhex(row[1]),
+            row[2],
+            row[3],
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord):
@@ -112,6 +132,14 @@ class PoolStore:
         if row is None:
             return None
         return self._row_to_farmer_record(row)
+        
+    async def get_farmers(self) -> List[FarmerRecord]:
+        # TODO(pool): use cache
+        cursor = await self.connection.execute(
+             "SELECT * from farmer",
+        )
+        rows = await cursor.fetchall()
+        return [self._row_to_farmer_record(row) for row in rows]
 
     async def update_difficulty(self, launcher_id: bytes32, difficulty: uint64):
         cursor = await self.connection.execute(
@@ -196,3 +224,52 @@ class PoolStore:
         rows = await cursor.fetchall()
         ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]
         return ret
+        
+    async def add_plot_record(self, plot_record: PlotRecord):
+        cursor = await self.connection.execute(
+            f"INSERT INTO plots VALUES(?, ?, ?, ?)",
+            (
+                plot_record.launcher_id.hex(),
+                bytes(plot_record.plot_id).hex(),
+                plot_record.plot_size,
+                plot_record.timestamp,
+            ),
+        )
+        await cursor.close()
+        await self.connection.commit()
+        
+    async def get_plot_records(self, launcher_id: bytes32) -> List[PlotRecord]:
+        # TODO(pool): use cache
+        cursor = await self.connection.execute(
+            "SELECT * from plots where launcher_id=?",
+            (launcher_id.hex(),),
+        )
+        rows = await cursor.fetchall()
+        return [self._row_to_plot_record(row) for row in rows]
+        
+    async def get_plot_record(self, launcher_id: bytes32, plot_id: G1Element) -> Optional[PlotRecord]:
+        # TODO(pool): use cache
+        cursor = await self.connection.execute(
+            "SELECT * from plots where launcher_id=? AND plot_id=?",
+            (launcher_id.hex(), bytes(plot_id).hex(),),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_plot_record(row)
+        
+    async def refresh_plot(self, launcher_id: bytes32, plot_id: G1Element, timestamp: uint64):
+        cursor = await self.connection.execute(
+            "UPDATE plots SET timestamp=? WHERE launcher_id=? AND plot_id=?", 
+            (timestamp, launcher_id.hex(), bytes(plot_id).hex()),
+        )
+        await cursor.close()
+        await self.connection.commit()
+        
+    async def remove_stale_plots(self, timestamp: uint64):
+        cursor = await self.connection.execute(
+            "DELETE FROM plots WHERE timestamp<=?", 
+            (timestamp,),
+        )
+        await cursor.close()
+        await self.connection.commit()

@@ -19,3 +19,5 @@ confirmation_security_threshold: 6
 payment_interval: 600
 max_additions_per_transaction: 400
 number_of_partials_target: 30
+plot_records:
+  time_to_delete: 86400

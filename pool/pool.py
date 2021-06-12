@@ -34,7 +34,7 @@ from chia.pools.pool_puzzles import (
 from difficulty_adjustment import get_new_difficulty
 from error_codes import PoolErr
 from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
-from store import FarmerRecord, PoolStore
+from store import FarmerRecord, PlotRecord, PoolStore
 
 
 class Pool:
@@ -53,6 +53,10 @@ class Pool:
         self.info_name = pool_config["pool_info"]["name"];
         self.info_logo_url = pool_config["pool_info"]["logo_url"];
         self.info_description = pool_config["pool_info"]["description"];
+
+        # This will delete the plot records after the time elapsed here unless they are refreshed by a partial
+        # Make sure we set this to around the time it takes a single plot to submit a partial
+        self.time_to_delete_plots = pool_config["plot_records"]["time_to_delete"];
 
         self.private_key = private_key
         self.public_key: G1Element = private_key.get_g1()
@@ -141,8 +145,12 @@ class Pool:
         # We target these many partials for this number of seconds. We adjust after receiving this many partials.
         self.number_of_partials_target: int = pool_config["number_of_partials_target"]
         self.time_target: int = 24 * 360
+        
+        # Current estimated pool netspace based on rolling plot records in gib
+        self.estimated_pool_netspace = 0;
 
         # Tasks (infinite While loops) for different purposes
+        self.plot_record_loop_task: Optional[asyncio.Task] = None
         self.confirm_partials_loop_task: Optional[asyncio.Task] = None
         self.collect_pool_rewards_loop_task: Optional[asyncio.Task] = None
         self.create_payment_loop_task: Optional[asyncio.Task] = None
@@ -171,6 +179,7 @@ class Pool:
 
         self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
 
+        self.plot_record_loop_task = asyncio.create_task(self.plot_record_loop())
         self.confirm_partials_loop_task = asyncio.create_task(self.confirm_partials_loop())
         self.collect_pool_rewards_loop_task = asyncio.create_task(self.collect_pool_rewards_loop())
         self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
@@ -180,6 +189,8 @@ class Pool:
         self.pending_payments = asyncio.Queue()
 
     async def stop(self):
+        if self.plot_record_loop_task is not None:
+            self.plot_record_loop_task.cancel()
         if self.confirm_partials_loop_task is not None:
             self.confirm_partials_loop_task.cancel()
         if self.collect_pool_rewards_loop_task is not None:
@@ -442,6 +453,46 @@ class Pool:
                 # TODO(pool): retry transaction if failed
                 self.log.error(f"Unexpected error in submit_payment_loop: {e}")
                 await asyncio.sleep(60)
+                
+    async def plot_record_loop(self):
+        """
+        This will do record keeping on our plot records and update our pool's estimated netspace
+        """
+
+        while True:
+            try:
+                # Remove stale plots that haven't been refreshed in a certain amount of time
+                await self.store.remove_stale_plots(int(time.time())-self.time_to_delete_plots)
+ 
+                # Loop the plot records and calculate the estimated space
+                # We could grab the whole table and just loop the plots to get our estimated pool netspace
+                # Instead we do it this way for the future so we can parse each farmer's plots individually for various things
+                total_plots = 0
+                total_size = 0
+                farmers: Optional[FarmerRecord] = await self.store.get_farmers()
+                for farmer in farmers:
+                    plot_records: Optional[PlotRecord] = await self.store.get_plot_records(farmer.launcher_id)
+                    for plot in plot_records:
+                    
+                        # This is our net space calculation based on 0.000762*k*2^k
+                        kb_estimation = (0.000762*plot.plot_size) * pow(2, plot.plot_size)
+                        total_size += kb_estimation/1000000;
+                        #self.log.info(f"Farmer {farmer.launcher_id} -- k{plot.plot_size} plot -- {round(kb_estimation,3)} kib -- {round((kb_estimation/1000000),3)} gib")
+                        
+                    total_plots+=len(plot_records);
+
+                self.log.info(f"Total farmers in pool: {len(farmers)}")
+                self.log.info(f"Total active plots: {total_plots} with {round(total_size,3)} GiB estimated pool netspace")
+                
+                self.estimated_pool_netspace = round(total_size,3)
+
+                await asyncio.sleep(60)
+
+            except asyncio.CancelledError:
+                self.log.info("Cancelled test loop, closing")
+                return
+            except Exception as e:
+                self.log.error(f"Unexpected error: {e}")
 
     async def confirm_partials_loop(self):
         """
@@ -563,6 +614,24 @@ class Pool:
                         new_payout_instructions,
                         True,
                     )
+                    
+                # Plot record
+                plot_record: Optional[PlotRecord] = await self.store.get_plot_record(partial.payload.launcher_id, partial.payload.proof_of_space.plot_public_key)
+                if plot_record is None:
+                    self.log.info(f"New plot for farmer: {partial.payload.launcher_id.hex()}")
+                    plot_record = PlotRecord(
+                        partial.payload.launcher_id,
+                        partial.payload.proof_of_space.plot_public_key,
+                        partial.payload.proof_of_space.size,
+                        int(time.time()),
+                    )
+                    await self.store.add_plot_record(plot_record)
+                else:
+                    self.log.info(f"Refreshing plot for farmer: {partial.payload.launcher_id.hex()}")
+                    await self.store.refresh_plot(
+                        partial.payload.launcher_id, 
+                        partial.payload.proof_of_space.plot_public_key,
+                        int(time.time()))
 
                 await self.store.add_farmer_record(farmer_record)
                 await self.store.add_partial(partial.payload.launcher_id, uint64(int(time.time())), points_received)

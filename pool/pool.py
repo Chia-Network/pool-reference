@@ -34,7 +34,7 @@ from chia.pools.pool_puzzles import (
 from pool.difficulty_adjustment import get_new_difficulty
 from pool.error_codes import PoolErr
 from pool.singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
-from pool.store import FarmerRecord, PoolStore
+from pool.store import FarmerRecord, PaymentRecord, PoolStore
 
 
 class Pool:
@@ -323,7 +323,9 @@ class Pool:
                     await asyncio.sleep(60)
                     continue
 
-                if self.pending_payments.qsize() != 0:
+                # CHANGE_EDU
+                # if self.pending_payments.qsize() != 0:
+                if len(self.store.get_no_completed_payments()) != 0:
                     self.log.warning(f"Pending payments ({self.pending_payments.qsize()}), waiting")
                     await asyncio.sleep(60)
                     continue
@@ -358,6 +360,18 @@ class Pool:
                         mojo_per_point = floor(amount_to_distribute / total_points)
                         self.log.info(f"Paying out {mojo_per_point} mojo / point")
 
+                        # CHANGE_EDU
+                        # TODO: Get last payment for from_date
+                        payments = []
+                        actual_time = uint64(int(time.time()))
+                        payment = PaymentRecord(
+                            from_date=actual_time,
+                            to_date=actual_time,
+                            status='PENDING',
+                            total_amount=total_amount_claimed,
+                            timestamp=actual_time
+                        )
+                        # END CHANGE_EDU
                         additions_sub_list: List[Dict] = [
                             {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount}
                         ]
@@ -365,16 +379,29 @@ class Pool:
                             additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point})
 
                             if len(additions_sub_list) == self.max_additions_per_transaction:
-                                await self.pending_payments.put(additions_sub_list.copy())
+                                # CHANGE_EDU
+                                # await self.pending_payments.put(additions_sub_list.copy())
+                                payment._coins_record = additions_sub_list.copy()
+                                payments.put(additions_sub_list.copy())
                                 self.log.info(f"Will make payments: {additions_sub_list}")
                                 additions_sub_list = []
+                                payment = PaymentRecord(
+                                    from_date=actual_time,
+                                    to_date=actual_time,
+                                    status='PENDING',
+                                    total_amount=total_amount_claimed,
+                                    timestamp=actual_time
+                                )
 
                         if len(additions_sub_list) > 0:
                             self.log.info(f"Will make payments: {additions_sub_list}")
-                            await self.pending_payments.put(additions_sub_list.copy())
+                            # CHANGE_EDU
+                            # await self.pending_payments.put(additions_sub_list.copy())
+                            payment._coins_record = additions_sub_list.copy()
+                            payments.put(additions_sub_list.copy())
 
                         # Subtract the points from each farmer
-                        await self.store.clear_farmer_points()
+                        await self.store.clear_farmer_points(payments)
                     else:
                         self.log.info(f"No points for any farmer. Waiting {self.payment_interval}")
 
@@ -396,8 +423,14 @@ class Pool:
                     await asyncio.sleep(60)
                     continue
 
-                payment_targets = await self.pending_payments.get()
-                assert len(payment_targets) > 0
+                # CHANGE EDU
+                # payment_targets = await self.pending_payments.get()
+                # assert len(payment_targets) > 0
+                payment: PaymentRecord = self.store.get_pending_payment()
+                assert payment is not None
+                payment_targets = payment._coins_record
+                payment.status = 'PROCESSING'
+                self.store.update_payment_status(payment)
 
                 self.log.info(f"Submitting a payment: {payment_targets}")
 
@@ -409,10 +442,17 @@ class Pool:
                     transaction: TransactionRecord = await self.wallet_rpc_client.send_transaction_multi(
                         self.wallet_id, payment_targets, fee=blockchain_fee
                     )
+                    # CHANGE_EDU
+                    payment.status = 'CREATED'
+                    payment.txn_name = transaction.name
+                    self.store.update_payment_status_and_txn_name(payment)
                 except ValueError as e:
                     self.log.error(f"Error making payment: {e}")
                     await asyncio.sleep(10)
-                    await self.pending_payments.put(payment_targets)
+                    # CHANGE_EDU
+                    # await self.pending_payments.put(payment_targets)
+                    payment.status = 'PENDING'
+                    self.store.update_payment_status(payment)
                     continue
 
                 self.log.info(f"Transaction: {transaction}")
@@ -429,6 +469,8 @@ class Pool:
                     if not transaction.confirmed:
                         self.log.info(f"Not confirmed. In mempool? {transaction.is_in_mempool()}")
                     else:
+                        payment.status = 'COMPLETED'
+                        self.store.update_payment_status(payment)
                         self.log.info(f"Confirmations: {peak_height - transaction.confirmed_at_height}")
                     await asyncio.sleep(10)
 

@@ -1,4 +1,5 @@
 import asyncio
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Set, List, Tuple, Dict
@@ -26,6 +27,28 @@ class FarmerRecord(Streamable):
     difficulty: uint64  # Current difficulty for this farmer
     pool_payout_instructions: str  # This is where the pool will pay out rewards to the farmer
     is_pool_member: bool  # If the farmer leaves the pool, this gets set to False
+
+
+@dataclass(frozen=True)
+@streamable
+class PaymentRecord(Streamable):
+    id: uint32
+    from_date: uint64
+    to_date: uint64
+    status: str
+    txn_name: str
+    coins_record: str  # List[Dict]
+    total_amount: uint64
+    timestamp: uint64
+
+    _coins_record = []
+
+    @property
+    def coins_record_str(self):
+        return json.dumps(self._coins_record)
+    
+    def init_coins_record(self):
+        self._coins_record = json.loads()
 
 
 class PoolStore:
@@ -60,9 +83,23 @@ class PoolStore:
             "CREATE TABLE IF NOT EXISTS partial(launcher_id text, timestamp bigint, difficulty bigint)"
         )
 
+        await self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS payment(\
+                id integer primary key,\
+                from_date bigint,\
+                to_date bigint,\
+                status text,\
+                txn_name text,\
+                coins_record text,\
+                total_amount bigint,\
+                timestamp bigint\
+            )"
+        )
+
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS payment_status_index on payment(status)")
 
         await self.connection.commit()
 
@@ -82,6 +119,20 @@ class PoolStore:
             row[8],
             True if row[9] == 1 else False,
         )
+    
+    @staticmethod
+    def _row_to_payment_record(row) -> PaymentRecord:
+        payment = PaymentRecord(
+            row[0],
+            uint64(row[1]),
+            uint64(row[2]),
+            row[3],
+            row[4],
+            row[5],
+            uint64(row[6]),
+            uint64(row[7])
+        )
+        payment.init_coins_record()
 
     async def add_farmer_record(self, farmer_record: FarmerRecord):
         cursor = await self.connection.execute(
@@ -175,7 +226,27 @@ class PoolStore:
             ret.append((total_points, ph))
         return ret
 
-    async def clear_farmer_points(self) -> None:
+    async def clear_farmer_points(self, payments: List[PaymentRecord]) -> None:
+        """Extendeed method to create the payments."""
+
+        records = []
+        for payment in payments:
+            records.put([
+                payment.from_date,
+                payment.to_date,
+                payment.status,
+                payment.txn_data,
+                payment.coins_record_str(),
+                payment.total_amount,
+                payment.timestamp
+            ])
+        cursor = await self.connection.execute(
+            "INSERT into payment (from_date, to_date, status, txn_data, coins_record, total_amount, timestamp) \
+                VALUES(?, ?, ?, ?, ?, ?, ?)",
+            records,
+        )
+        await cursor.close()
+
         cursor = await self.connection.execute(f"UPDATE farmer set points=0")
         await cursor.close()
         await self.connection.commit()
@@ -196,3 +267,36 @@ class PoolStore:
         rows = await cursor.fetchall()
         ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]
         return ret
+
+    async def get_pending_payment(self) -> PaymentRecord:
+        cursor = await self.connection.execute(
+            "SELECT id, from_date, to_date, status, txn_name, coins_record, total_amount, timestamp \
+            from payment WHERE status == 'PENDING' ORDER BY timestamp ASC LIMIT 1",
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_payment_record(row)
+
+    async def get_no_completed_payments(self) -> List[PaymentRecord]:
+        cursor = await self.connection.execute(
+            "SELECT id, from_date, to_date, status, txn_name, coins_record, total_amount, timestamp \
+            from payment WHERE status not in ('COMPLETED', 'CANCELLED') ORDER BY timestamp ASC",
+        )
+        rows = await cursor.fetchall()
+        ret: List[PaymentRecord] = [self._row_to_payment_record(row) for row in rows]
+        return ret
+
+    async def update_payment_status(self, payment_id: int, status: str):
+        cursor = await self.connection.execute(
+            f"UPDATE payment SET status=? WHERE id=?", (status, payment_id)
+        )
+        await cursor.close()
+        await self.connection.commit()
+    
+    async def update_payment_status_and_txn_name(self, payment_id: int, status: str, txn_name: bytes32):
+        cursor = await self.connection.execute(
+            f"UPDATE payment SET status=?, txn_name=? WHERE id=?", (status, txn_name.hex(), payment_id)
+        )
+        await cursor.close()
+        await self.connection.commit()

@@ -516,7 +516,7 @@ class Pool:
                         last_state,
                         points_received,
                         partial.payload.suggested_difficulty,
-                        partial.payload.pool_payout_instructions,
+                        partial.payload.payout_instructions,
                         True,
                     )
                     self.scan_p2_singleton_puzzle_hashes.add(partial.payload.proof_of_space.pool_contract_puzzle_hash)
@@ -530,10 +530,10 @@ class Pool:
                         == farmer_record.p2_singleton_puzzle_hash
                     )
 
-                    new_payout_instructions: str = farmer_record.pool_payout_instructions
+                    new_payout_instructions: str = farmer_record.payout_instructions
                     new_authentication_pk: G1Element = farmer_record.authentication_public_key
                     new_authentication_pk_timestamp: uint64 = farmer_record.authentication_public_key_timestamp
-                    if farmer_record.pool_payout_instructions != partial.payload.pool_payout_instructions:
+                    if farmer_record.payout_instructions != partial.payload.payout_instructions:
                         # Only allow changing payout instructions if we have the latest authentication public key
                         if (
                             farmer_record.authentication_public_key_timestamp
@@ -541,9 +541,9 @@ class Pool:
                         ):
                             # This means the authentication key being used is at least as new as the one in the DB
                             self.log.info(
-                                f"Farmer changing rewards target to {partial.payload.pool_payout_instructions}"
+                                f"Farmer changing rewards target to {partial.payload.payout_instructions}"
                             )
-                            new_payout_instructions = partial.payload.pool_payout_instructions
+                            new_payout_instructions = partial.payload.payout_instructions
                             new_authentication_pk = partial.payload.authentication_key_info.authentication_public_key
                             new_authentication_pk_timestamp = (
                                 partial.payload.authentication_key_info.authentication_public_key_timestamp

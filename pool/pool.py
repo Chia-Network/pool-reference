@@ -551,7 +551,7 @@ class Pool:
                 await self.store.add_farmer_record(farmer_record)
                 await self.store.add_partial(partial.payload.launcher_id, uint64(int(time.time())), points_received)
 
-            self.log.info(f"Farmer {partial.payload.owner_public_key} updated points to: " f"{farmer_record.points}")
+            self.log.info(f"Farmer {farmer_record.launcher_id} updated points to: " f"{farmer_record.points}")
         except Exception as e:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")

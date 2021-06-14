@@ -113,7 +113,7 @@ class PoolServer:
         return obj_to_response(res_dict)
 
 
-server: PoolServer = None
+server: Optional[PoolServer] = None
 runner = None
 
 

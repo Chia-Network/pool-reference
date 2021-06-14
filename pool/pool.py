@@ -491,7 +491,7 @@ class Pool:
             # Now we need to check to see that the singleton in the blockchain is still assigned to this pool
             singleton_state_tuple: Optional[
                 Tuple[CoinSolution, PoolState]
-            ] = await self.get_and_validate_singleton_state(partial)
+            ] = await self.get_and_validate_singleton_state(partial.payload.launcher_id)
 
             if singleton_state_tuple is None:
                 self.log.info("Singleton state is None.")
@@ -556,25 +556,23 @@ class Pool:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
 
-    async def get_and_validate_singleton_state(
-        self, partial: PostPartialRequest
-    ) -> Optional[Tuple[CoinSolution, PoolState]]:
+    async def get_and_validate_singleton_state(self, launcher_id: bytes32) -> Optional[Tuple[CoinSolution, PoolState]]:
         """
         :return: the state of the singleton, if it currently exists in the blockchain, and if it is assigned to
         our pool, with the correct parameters. Otherwise, None. Note that this state must be buried (recent state
         changes are not returned)
         """
-        singleton_task: Optional[Task] = self.follow_singleton_tasks.get(partial.payload.launcher_id, None)
+        singleton_task: Optional[Task] = self.follow_singleton_tasks.get(launcher_id, None)
         remove_after = False
         if singleton_task is None or singleton_task.done():
-            farmer_rec: Optional[FarmerRecord] = await self.store.get_farmer_record(partial.payload.launcher_id)
+            farmer_rec: Optional[FarmerRecord] = await self.store.get_farmer_record(launcher_id)
             peak_height: uint32 = self.blockchain_state["peak"].height
             if farmer_rec is None:
                 desired_state: PoolState = PoolState(
                     POOL_PROTOCOL_VERSION,
                     PoolSingletonState.FARMING_TO_POOL.value,
                     self.default_target_puzzle_hash,
-                    partial.payload.owner_public_key,
+                    G1Element(),
                     self.pool_url,
                     self.relative_lock_height,
                 )
@@ -590,19 +588,19 @@ class Pool:
             singleton_task = asyncio.create_task(
                 get_and_validate_singleton_state_inner(
                     self.node_rpc_client,
-                    partial.payload.launcher_id,
+                    launcher_id,
                     farmer_rec,
                     peak_height,
                     self.confirmation_security_threshold,
                     desired_state,
                 )
             )
-            self.follow_singleton_tasks[partial.payload.launcher_id] = singleton_task
+            self.follow_singleton_tasks[launcher_id] = singleton_task
             remove_after = True
 
         optional_result: Optional[Tuple[CoinSolution, PoolState, bool, bool]] = await singleton_task
-        if remove_after and partial.payload.launcher_id in self.follow_singleton_tasks:
-            await self.follow_singleton_tasks.pop(partial.payload.launcher_id)
+        if remove_after and launcher_id in self.follow_singleton_tasks:
+            await self.follow_singleton_tasks.pop(launcher_id)
 
         if optional_result is None:
             return None
@@ -612,9 +610,9 @@ class Pool:
             # This means the singleton has been changed in the blockchain (either by us or someone else). We
             # still keep track of this singleton if the farmer has changed to a different pool, in case they
             # switch back.
-            self.log.info(f"Updating singleton state for {partial.payload.launcher_id}")
+            self.log.info(f"Updating singleton state for {launcher_id}")
             await self.store.update_singleton(
-                partial.payload.launcher_id, singleton_tip, singleton_tip_state, is_pool_member
+                launcher_id, singleton_tip, singleton_tip_state, is_pool_member
             )
 
         if is_pool_member:

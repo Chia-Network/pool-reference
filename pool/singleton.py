@@ -1,4 +1,3 @@
-import asyncio
 from typing import List, Optional, Tuple
 import logging
 
@@ -60,7 +59,9 @@ async def get_and_validate_singleton_state_inner(
         last_not_none_state: PoolState = saved_state
         assert last_solution is not None
 
-        last_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(last_solution.coin.name())
+        last_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(
+            last_solution.coin.name()
+        )
         assert last_coin_record is not None
 
         while True:
@@ -90,9 +91,19 @@ async def get_and_validate_singleton_state_inner(
 
         # Validate state of the singleton
         is_pool_member = True
-        if desired_state is not None and last_not_none_state != desired_state:
-            log.info(f"Desired: {desired_state}, got: {last_not_none_state}")
-            is_pool_member = False
+        if desired_state is not None:
+            if last_not_none_state.target_puzzle_hash != desired_state.target_puzzle_hash:
+                log.info(f"Wrong target puzzle hash: {last_not_none_state.target_puzzle_hash}")
+                is_pool_member = False
+            elif last_not_none_state.relative_lock_height != desired_state.relative_lock_height:
+                log.info(f"Wrong relative lock height: {last_not_none_state.relative_lock_height}")
+                is_pool_member = False
+            elif last_not_none_state.version != desired_state.version:
+                log.info(f"Wrong version {last_not_none_state.version}")
+                is_pool_member = False
+            elif last_not_none_state.state != desired_state.state:
+                log.info(f"Invalid singleton state {last_not_none_state.state}")
+                is_pool_member = False
 
         log.info(f"Is pool member? {is_pool_member}")
         return saved_solution, saved_state, updated, is_pool_member

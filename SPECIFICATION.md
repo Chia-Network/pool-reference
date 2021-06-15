@@ -413,18 +413,3 @@ farmers, and points should be acknowledged and accumulated points returned in th
 ## Security considerations
 The pool must ensure that partials arrive quickly, faster than the 28 second time limit of inclusion into the
 blockchain. This allows farmers that have slow setups to detect issues.
-
-## Singletons
-### Pay to singleton puzzle
-TODO
-### Singleton genesis
-TODO
-
-### Singleton outer layer
-TODO
-
-### Singleton escaping
-TODO
-
-### Singleton
-TODO

@@ -559,7 +559,7 @@ class Pool:
                     f"Payout instructions must be an xch address for this pool.",
                 )
 
-            if not AugSchemeMPL.verify(last_state.owner_pubkey, bytes(request.payload), request.signature):
+            if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
                 return error_response(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
             delay_time, delay_puzzle_hash = get_delayed_puz_info_from_launcher_spend(last_spend)
@@ -598,7 +598,7 @@ class Pool:
         if singleton_state_tuple is None:
             return error_response(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton, or not a pool member")
 
-        if not AugSchemeMPL.verify(last_state.owner_pubkey, bytes(request.payload), request.signature):
+        if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
             return error_response(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
         farmer_dict = farmer_record.to_json_dict()
@@ -704,7 +704,7 @@ class Pool:
         time_received_partial: uint64,
     ) -> Dict:
         # Validate signatures
-        message: bytes = bytes(partial.payload)
+        message: bytes32 = partial.payload.get_hash()
         pk1: G1Element = partial.payload.proof_of_space.plot_public_key
         pk2: G1Element = farmer_record.authentication_public_key
         valid_sig = AugSchemeMPL.aggregate_verify([pk1, pk2], [message, message], partial.aggregate_signature)

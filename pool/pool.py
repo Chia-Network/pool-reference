@@ -171,10 +171,10 @@ class Pool:
 
         self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
-            self_hostname, uint16(58555), DEFAULT_ROOT_PATH, self.config
+            self_hostname, uint16(8555), DEFAULT_ROOT_PATH, self.config
         )
         self.wallet_rpc_client = await WalletRpcClient.create(
-            self.config["self_hostname"], uint16(59256), DEFAULT_ROOT_PATH, self.config
+            self.config["self_hostname"], uint16(9256), DEFAULT_ROOT_PATH, self.config
         )
         self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
         res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
@@ -406,6 +406,7 @@ class Pool:
         while True:
             try:
                 peak_height = self.blockchain_state["peak"].height
+                await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
                 if not self.blockchain_state["sync"]["synced"] or not self.wallet_synced:
                     self.log.warning("Waiting for wallet sync")
                     await asyncio.sleep(60)

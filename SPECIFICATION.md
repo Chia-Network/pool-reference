@@ -1,7 +1,8 @@
 # Chia Pool Protocol 1.0
 
 This is the initial version of the Chia Pool Protocol. It has been designed to be simple, and to be extended later.
-It relies on farmers having smart coins (referred to as Pool NFT in GUI + CLI) which allow them to switch between pools by making a transaction. Furthermore, it decreases the reliance on pools for block production, since
+It relies on farmers having smart coins (referred to as Pool NFT in GUI + CLI) which allow them to switch between pools
+by making transactions on the blockchain. Furthermore, it decreases the reliance on pools for block production, since
 the protocol only handles distribution of rewards, and it protects against pools or farmers acting maliciously.
 
 ## Parties
@@ -14,9 +15,9 @@ to run a full node, they can configure their node to connect to a remote full no
 A pool operator can support any number of farmers.
 
 ## Farmer identification
-A farmer is uniquely identified by the identifier of the farmers singleton blockchain, this is what `launcher_id` refers
+A farmer is uniquely identified by the identifier of the farmers singleton on the blockchain, this is what `launcher_id` refers
 to. The `launcher_id` can be used as a primary key. The pool must periodically check the singleton on the blockchain to
-validate that it's farming to the pool, and not escaping or farming to another pool.
+validate that it's farming to the pool, and not leaving or farming to another pool.
 
 ## Farmer authentication
 For the farmer to authenticate at the pool the following time based authentication token scheme must be added to the
@@ -29,7 +30,7 @@ authentication_token = current_utc_minutes / authentication_token_timeout
 Where `authentication_token_timeout` is a configuration parameter of the pool which is also included in the
 [GET /pool_info](#get-pool_info) response that must be respected by the farmer. Whereas `current_utc_minutes` is the
 local UTC timestamp in **minutes** at the moment of signing. The local clock should ideally be in sync with a time
-synchronization protocol e.g., NTP.
+synchronization protocol e.g., NTP. The authentication token is usually included in a signed payload.
 
 ## HTTPS Endpoints Summary
 
@@ -114,7 +115,7 @@ The pool protocol version supported by the pool.
 
 #### relative_lock_height
 The number of blocks (confirmations) that a user must wait between the point when they start escaping a pool, and the
-point at which they can finalize their pool switch.
+point at which they can finalize their pool switch. Must be less than 4608 (24 hours).
 
 #### target_puzzle_hash
 This is the target of where rewards will be sent to from the singleton. Controlled by the pool.

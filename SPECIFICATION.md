@@ -283,6 +283,7 @@ Request:
 {
   "payload": {
     "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
+    "authentication_token": 27062279,
     "proof_of_space": {
       "challenge": "0xe0e55d45eef8d53a6b68220abeec8f14f57baaa80dbd7b37430e42f9ac6e2c0e",
       "pool_contract_puzzle_hash": "0x9e3e9b37b54cf6c7467e277b6e4ca9ab6bdea53cdc1d79c000dc95b6a3908a3b",
@@ -291,7 +292,8 @@ Request:
       "proof": "0xb2cd6374c8db249ad3b638199dbb6eb9eaefe55042cef66c43cf1e31161f4a1280455d8b53c2823c747fd4f8823c44de3a52cc85332431630857c359935660c3403ae3a92728d003dd66ef5966317cd49894d265a3e4c43f0530a1192874ed327e6f35862a25dfb67c5d0d573d078b4b8ba9bfb1cce52fd17939ae9d7033d3aa09d6c449e392ba2472a1fecf992abcc51c3bf5d56a72fef9900e79b8dba88a5afc39e04993325a0cd6b67757355b836f"
     },
     "sp_hash": "0x4c52796ca4ff775fbcdac90140c12270d26a37724ad77988535d58b376332533",
-    "end_of_sub_slot": false
+    "end_of_sub_slot": false,
+    "harvester_id": "0xb9d8de98ec5c026f1167b0b587715d7137f43b6d1d40b81d9aac6dc8355fde28"
   },
   "aggregate_signature": "0xa078dc1462bbcdec7cd651c5c3d7584ac6c6a142e049c7790f3b0ee8768ed6326e3a639f949b2293469be561adfa1c57130f64334994f53c1bd12e59579e27127fbabadc5e8793a2ef194a5a22ac832e92dcb6ad9a0d33bd264726f6e8df6aad"
 }
@@ -340,10 +342,16 @@ check a few minutes after processing the partial, that it has not been reverted 
 If true, the sp_hash encodes the challenge_hash of the sub slot.
 
 #### aggregate_signature
-This is a 2/2 BLS signature of the following message:
+This is a 2/2 BLS signature of the following message, in Streamable serialization:
 
 ```
-[dict(`payload`), uint32(`authentication_token`)]
+class PostPartialPayload(Streamable):
+    launcher_id: bytes32
+    authentication_token: uint64
+    proof_of_space: ProofOfSpace
+    sp_hash: bytes32
+    end_of_sub_slot: bool
+    harvester_id: bytes32
 ```
 
 signed by the private keys of the following keys:

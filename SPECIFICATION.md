@@ -75,6 +75,17 @@ The following errors may occur:
 | 0x0F | Delay time too short |
 | 0x10 | Request failed |
 
+## Signature validation
+
+Most of the endpoints require signature a validation. The validation requires serialization of the endpoints payloads
+to calculate the message hash which is done like:
+
+```
+message_hash = sha256(serialized_payload)
+```
+
+The serialized payload must follow the `Streamable` standard defined
+[here](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/util/streamable.py).
 ## GET /pool_info
 
 This takes no arguments, and allows clients to fetch information about a pool. It is called right before joining a pool,
@@ -158,14 +169,16 @@ See [Farmer authentication](#farmer-authentication) for the specification of
 `authentication_token`.
 
 #### signature
-This is a BLS signature of the following message:
+This is a BLS signature of the hashed serialization of the following data in the given order:
 
-```
-sha256(bytes32(launcher_id) + uint64(authentication_token))
-```
+|Element|Type|
+|---|---|
+|launcher_id | bytes32 |
+|authentication_token | uint64 |
 
-signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS IETF spec.
-
+where the parameter must be serialized and hashed according to [Signature validation](#signature-validation) and the
+signature must be signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS
+IETF spec.
 
 ## POST /farmer
 Allows farmers to make them known by the pool. This is required once before submitting the first partial.
@@ -212,21 +225,17 @@ A request from the farmer to update the difficulty. Can be ignored or respected 
 be respected if the authentication public key is the most recent one seen for this farmer.
 
 #### signature
-This is a BLS signature of the following message, streamed in Streamable format.
+This is a BLS signature of the hashed serialization of the payload:
 
 ```
-class PostFarmerPayload(Streamable):
-    launcher_id: bytes32
-    authentication_token: uint64
-    authentication_public_key: G1Element
-    payout_instructions: str
-    suggested_difficulty: Optional[uint64]
+sha256(PostFarmerPayload)
 ```
 
 signed by the private key of the `owner_public_key` using the Augmented Scheme in the BLS IETF spec.
 
-See [Farmer authentication](#farmer-authentication) for the specification of
-`authentication_token`.
+See the [streamable](#signature-validation) class `PostFarmerPayload` in the
+[pool protocol](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/protocols/pool_protocol.py)
+and [Farmer authentication](#farmer-authentication) for the specification of `authentication_token`.
 
 ## PUT /farmer
 Allows farmers to update their information on the pool.
@@ -247,9 +256,12 @@ Request:
 
 For a description of the request body entries see the corresponding keys in [POST /farmer](#post-farmer). The values
 provided with the key/value pairs are used to update the existing values. All entries, except `launcher_id`, are
-optional but there must be at least one of them. The signature is made on a slightly different payload: the arguments
-`authentication_public_key`, `payout_instructions`, and `suggested_difficulty`, are all Optionals in the streamable
-serialization, which means they must contain the prepended optional byte.
+optional but there must be at least one of them. 
+
+See the [streamable](#signature-validation) class `PutFarmerPayload` in the
+[pool protocol](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/protocols/pool_protocol.py) for details
+and [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
 
 Successful response:
 ```json
@@ -343,24 +355,20 @@ check a few minutes after processing the partial, that it has not been reverted 
 If true, the sp_hash encodes the challenge_hash of the sub slot.
 
 #### aggregate_signature
-This is a 2/2 BLS signature of the following message, in Streamable serialization:
+This is a 2/2 BLS signature of the hashed serialization of the payload:
 
 ```
-class PostPartialPayload(Streamable):
-    launcher_id: bytes32
-    authentication_token: uint64
-    proof_of_space: ProofOfSpace
-    sp_hash: bytes32
-    end_of_sub_slot: bool
-    harvester_id: bytes32
+sha256(PostPartialPayload)
 ```
 
-signed by the private keys of the following keys:
+signed by the private keys of the following keys using the Augmented Scheme in the BLS IETF spec:
 
 1. `plot_public_key`
 2. `authentication_public_key`
 
-using the Augmented Scheme in the BLS IETF spec. See [Farmer authentication](#farmer-authentication) for the specification of
+See the [streamable](#signature-validation) class `PostPartialPayload` in the
+[pool protocol](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/protocols/pool_protocol.py) for details
+and [Farmer authentication](#farmer-authentication) for the specification of
 `authentication_token`.
 
 A partial must be completely rejected if the BLS signature does not validate.
@@ -390,16 +398,17 @@ https://poolurl.com/login?launcher_id=:launcher_id&signature=:signature
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
 
 #### signature
-This is a BLS signature of the following message:
+This is a BLS signature of the hashed serialization of the following data in the given order:
 
-```
-[bytes32(launcher_id), str(target_puzzle_hash), uint32(authentication_token)]
-```
+|Element|Type|
+|---|---|
+|launcher_id | bytes32 |
+|target_puzzle_hash | bytes32 |
+|authentication_token | uint64 |
 
-signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS IETF spec.
-
-See [Farmer authentication](#farmer-authentication) for the specification of
-`authentication_token`.
+where the parameter must be serialized and hashed according to [Signature validation](#signature-validation) and the
+signature must be signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS
+IETF spec.
 
 ## 1/8 vs 7/8
 Note that the coinbase rewards in Chia are divided into two coins: the farmer coin and the pool coin. The farmer coin

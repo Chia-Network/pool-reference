@@ -209,6 +209,10 @@ The successful response must always contain a welcome message which must be defi
 #### payload.launcher_id
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
 
+#### payload.authentication_token
+See [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
+
 #### payload.authentication_public_key
 The public key of the authentication key, which is a temporary key used by the farmer to sign requests
 to the pool. It is an authorization given by the `owner_key`, so that the owner key can be potentially kept more secure.
@@ -326,6 +330,10 @@ This is the main payload of the partial, which is signed by two keys: `authentic
 #### payload.launcher_id
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
 
+#### payload.authentication_token
+See [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
+
 #### payload.proof_of_space
 The proof of space in chia-blockchain format.
 
@@ -386,16 +394,25 @@ Note that there is no explicit account creation. A farmer can log in after makin
 Request parameter:
 ```
 - launcher_id
+- authentication_token
+- target_puzzle_hash
 - signature
 ```
 
 Example request:
 ```
-https://poolurl.com/login?launcher_id=:launcher_id&signature=:signature
+https://poolurl.com/login?launcher_id=:launcher_id&authentication_token=:token&target_puzzle_hash=:puzzle_hash&signature=:signature
 ```
 
 #### launcher_id
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
+
+#### authentication_token
+See [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
+
+#### target_puzzle_hash
+The pools target puzzle hash, see [GET /pool_info](#get-pool_info)
 
 #### signature
 This is a BLS signature of the hashed serialization of the following data in the given order:

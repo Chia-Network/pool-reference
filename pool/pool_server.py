@@ -113,7 +113,7 @@ class PoolServer:
 
         # Validate provided signature
         signature: G2Element = G2Element.from_bytes(hexstr_to_bytes(request_obj.rel_url.query["signature"]))
-        message = launcher_id + bytes(authentication_token)
+        message = std_hash(launcher_id + bytes(authentication_token))
         if not AugSchemeMPL.verify(farmer_record.authentication_public_key, message, signature):
             return error_response(
                 PoolErrorCode.INVALID_SIGNATURE,
@@ -216,7 +216,7 @@ class PoolServer:
 
         # Validate provided signature
         signature = request_obj.rel_url.query["signature"]
-        message = launcher_id + bytes(authentication_token)
+        message = std_hash(launcher_id + bytes(authentication_token))
         if not AugSchemeMPL.verify(farmer_record.authentication_public_key, message, signature):
             return error_response(
                 PoolErrorCode.INVALID_SIGNATURE,

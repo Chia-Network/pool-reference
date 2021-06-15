@@ -43,7 +43,7 @@ from chia.pools.pool_puzzles import (
 )
 
 from difficulty_adjustment import get_new_difficulty
-from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
+from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner, get_coin_spend
 from store import FarmerRecord, PoolStore
 from util import error_dict
 
@@ -564,7 +564,13 @@ class Pool:
             if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
                 return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
-            delay_time, delay_puzzle_hash = get_delayed_puz_info_from_launcher_spend(last_spend)
+            launcher_coin: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
+                request.payload.launcher_id
+            )
+            assert launcher_coin is not None and launcher_coin.spent
+
+            launcher_solution: Optional[CoinSolution] = await get_coin_spend(self.node_rpc_client, launcher_coin)
+            delay_time, delay_puzzle_hash = get_delayed_puz_info_from_launcher_spend(launcher_solution)
 
             if delay_time < 3600:
                 return error_dict(PoolErrorCode.DELAY_TIME_TOO_SHORT, f"Delay time too short, must be at least 1 hour")

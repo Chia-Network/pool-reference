@@ -143,7 +143,13 @@ async def create_absorb_transaction(
             log.info(f"Received reward {reward_coin_record.coin} that is not a pool reward.")
             continue
         absorb_spend: List[CoinSolution] = create_absorb_spend(
-            last_solution, last_state, launcher_coin_record.coin, found_block_index, genesis_challenge
+            last_solution,
+            last_state,
+            launcher_coin_record.coin,
+            found_block_index,
+            genesis_challenge,
+            farmer_record.delay_time,
+            farmer_record.delay_puzzle_hash,
         )
         last_solution = absorb_spend[0]
         all_spends += absorb_spend

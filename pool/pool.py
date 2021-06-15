@@ -564,6 +564,10 @@ class Pool:
                 return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
             delay_time, delay_puzzle_hash = get_delayed_puz_info_from_launcher_spend(last_spend)
+
+            if delay_time < 3600:
+                return error_dict(PoolErrorCode.DELAY_TIME_TOO_SHORT, f"Delay time too short, must be at least 1 hour")
+
             p2_singleton_puzzle_hash = launcher_id_to_p2_puzzle_hash(
                 request.payload.launcher_id, delay_time, delay_puzzle_hash
             )
@@ -571,6 +575,8 @@ class Pool:
             farmer_record = FarmerRecord(
                 request.payload.launcher_id,
                 p2_singleton_puzzle_hash,
+                delay_time,
+                delay_puzzle_hash,
                 request.payload.authentication_public_key,
                 last_spend,
                 last_state,

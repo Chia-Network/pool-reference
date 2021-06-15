@@ -17,7 +17,9 @@ from chia.util.streamable import streamable, Streamable
 @streamable
 class FarmerRecord(Streamable):
     launcher_id: bytes32  # This uniquely identifies the singleton on the blockchain (ID for this farmer)
-    p2_singleton_puzzle_hash: bytes32  # Derived from the launcher id
+    p2_singleton_puzzle_hash: bytes32  # Derived from the launcher id, delay_time and delay_puzzle_hash
+    delay_time: uint64  # Backup time after which farmer can claim rewards directly, if pool unresponsive
+    delay_puzzle_hash: bytes32  # Backup puzzlehash to claim rewards
     authentication_public_key: G1Element  # This is the latest public key of the farmer (signs all partials)
     singleton_tip: CoinSolution  # Last coin solution that is buried in the blockchain, for this singleton
     singleton_tip_state: PoolState  # Current state of the singleton
@@ -44,6 +46,8 @@ class PoolStore:
                 "CREATE TABLE IF NOT EXISTS farmer("
                 "launcher_id text PRIMARY KEY,"
                 " p2_singleton_puzzle_hash text,"
+                " delay_time bigint,"
+                " delay_puzzle_hash text,"
                 " authentication_public_key text,"
                 " singleton_tip blob,"
                 " singleton_tip_state blob,"
@@ -71,21 +75,25 @@ class PoolStore:
         return FarmerRecord(
             bytes.fromhex(row[0]),
             bytes.fromhex(row[1]),
-            G1Element.from_bytes(bytes.fromhex(row[2])),
-            CoinSolution.from_bytes(row[3]),
-            PoolState.from_bytes(row[4]),
-            row[5],
-            row[6],
+            row[2],
+            bytes.fromhex(row[3]),
+            G1Element.from_bytes(bytes.fromhex(row[4])),
+            CoinSolution.from_bytes(row[5]),
+            PoolState.from_bytes(row[6]),
             row[7],
-            True if row[8] == 1 else False,
+            row[8],
+            row[9],
+            True if row[10] == 1 else False,
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord):
         cursor = await self.connection.execute(
-            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 farmer_record.launcher_id.hex(),
                 farmer_record.p2_singleton_puzzle_hash.hex(),
+                farmer_record.delay_time,
+                farmer_record.delay_puzzle_hash.hex(),
                 bytes(farmer_record.authentication_public_key).hex(),
                 bytes(farmer_record.singleton_tip),
                 bytes(farmer_record.singleton_tip_state),

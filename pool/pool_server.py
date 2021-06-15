@@ -192,17 +192,7 @@ class PoolServer:
                 f"Farmer with launcher_id {partial.payload.launcher_id.hex()} not known.",
             )
 
-        async def await_and_call(cor, *args):
-            # 10 seconds gives our node some time to get the signage point, in case we are slightly slowed down
-            await asyncio.sleep(10)
-            res = await cor(args)
-            self.pool.log.info(f"Delayed response: {res}")
-
         post_partial_response = await self.pool.process_partial(partial, farmer_record, start_time)
-
-        # TODO, discuss this: Wouldn't it make sense to make this blocking and return the actual response?
-        if "error_code" in post_partial_response and "error_code" == PoolErrorCode.NOT_FOUND.value:
-            asyncio.create_task(await_and_call(self.pool.process_partial, partial, start_time, farmer_record))
 
         self.pool.log.info(
             f"post_partial response {post_partial_response}, time: {time.time() - start_time} "

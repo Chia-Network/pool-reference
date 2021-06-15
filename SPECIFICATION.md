@@ -85,11 +85,11 @@ scripts and JS injections. It returns a JSON response with the following data:
 ```json
 {
     "description": "(example) The Reference Pool allows you to pool with low fees, paying out daily using Chia.",
-    "fee": "0.01",
+    "fee": 0.01,
     "logo_url": "https://www.chia.net/img/chia_logo.svg",
     "minimum_difficulty": 10,
     "name": "The Reference Pool",
-    "protocol_version": "1.0",
+    "protocol_version": 1,
     "relative_lock_height": 100,
     "target_puzzle_hash": "0x344587cf06a39db471d2cc027504e8688a0a67cce961253500c956c73603fd58",
     "authentication_token_timeout": 5

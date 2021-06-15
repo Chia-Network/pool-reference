@@ -70,6 +70,8 @@ The following errors may occur:
 | 0x0B | Farmer already known |
 | 0x0C | Invalid authentication public key |
 | 0x0D | Invalid payout instructions |
+| 0x0E | Invalid singleton |
+| 0x0F | Delay time too short |
 
 ## GET /pool_info
 

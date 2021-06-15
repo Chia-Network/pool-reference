@@ -702,7 +702,7 @@ class Pool:
             # This means the singleton has been changed in the blockchain (either by us or someone else). We
             # still keep track of this singleton if the farmer has changed to a different pool, in case they
             # switch back.
-            self.log.info(f"Updating singleton state for {launcher_id} to {singleton_tip}")
+            self.log.info(f"Updating singleton state for {launcher_id}")
             await self.store.update_singleton(launcher_id, singleton_tip, singleton_tip_state, is_pool_member)
 
         if is_pool_member:
@@ -804,8 +804,8 @@ class Pool:
                 # Only update the difficulty if we meet certain conditions
                 new_difficulty: uint64 = get_new_difficulty(
                     recent_partials,
-                    self.number_of_partials_target,
-                    self.time_target,
+                    int(self.number_of_partials_target),
+                    int(self.time_target),
                     current_difficulty,
                     time_received_partial,
                     self.min_difficulty,

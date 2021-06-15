@@ -318,11 +318,10 @@ Request:
 
 Successful response:
 ```json
-{"points_balance": 1130, "current_difficulty": 10}
+{ "new_difficulty": 10}
 ```
 
-The successful response must always contain the points balance since the last payout, as well as the current difficulty
-that this farmer is being given credit for.
+The successful response must always contain the new difficulty which should be respected by the farmer.
 
 #### payload
 This is the main payload of the partial, which is signed by two keys: `authentication_key` and `plot_key`.

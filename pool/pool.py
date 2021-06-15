@@ -6,7 +6,8 @@ from asyncio import Task
 from math import floor
 from typing import Dict, Optional, Set, List, Tuple
 
-import os, yaml
+import os
+import yaml
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
 from chia.pools.pool_wallet_info import PoolState, PoolSingletonState, POOL_PROTOCOL_VERSION
@@ -25,7 +26,7 @@ from chia.types.coin_record import CoinRecord
 from chia.types.coin_solution import CoinSolution
 from chia.util.bech32m import decode_puzzle_hash
 from chia.consensus.constants import ConsensusConstants
-from chia.util.ints import uint64, uint16, uint32
+from chia.util.ints import uint8, uint16, uint32, uint64
 from chia.util.byte_types import hexstr_to_bytes
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.rpc.full_node_rpc_client import FullNodeRpcClient
@@ -36,9 +37,9 @@ from chia.consensus.pot_iterations import calculate_iterations_quality
 from chia.util.lru_cache import LRUCache
 from chia.wallet.transaction_record import TransactionRecord
 from chia.pools.pool_puzzles import (
-    launcher_id_to_p2_puzzle_hash,
     get_most_recent_singleton_coin_from_coin_solution,
     get_delayed_puz_info_from_launcher_spend,
+    launcher_id_to_p2_puzzle_hash,
 )
 
 from difficulty_adjustment import get_new_difficulty
@@ -53,17 +54,17 @@ class Pool:
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
         self.log.basicConfig(level=logging.INFO)
-        
+
         # We load our configurations from here
-        with open(os.getcwd()+'/config.yaml') as f:
+        with open(os.getcwd() + "/config.yaml") as f:
             pool_config: Dict = yaml.safe_load(f)
-            
+
         # Set our pool info here
-        self.info_default_res = pool_config["pool_info"]["default_res"];
-        self.info_name = pool_config["pool_info"]["name"];
-        self.info_logo_url = pool_config["pool_info"]["logo_url"];
-        self.info_description = pool_config["pool_info"]["description"];
-        self.welcome_message = pool_config["welcome_message"];
+        self.info_default_res = pool_config["pool_info"]["default_res"]
+        self.info_name = pool_config["pool_info"]["name"]
+        self.info_logo_url = pool_config["pool_info"]["logo_url"]
+        self.info_description = pool_config["pool_info"]["description"]
+        self.welcome_message = pool_config["welcome_message"]
 
         self.private_key = private_key
         self.public_key: G1Element = private_key.get_g1()
@@ -107,9 +108,7 @@ class Pool:
 
         # The pool fees will be sent to this address. This MUST be on a different key than the target_puzzle_hash,
         # otherwise, the fees will be sent to the users. Using 690783650
-        self.pool_fee_puzzle_hash: bytes32 = bytes32(
-            decode_puzzle_hash(pool_config["pool_fee_puzzle_hash"])
-        )
+        self.pool_fee_puzzle_hash: bytes32 = bytes32(decode_puzzle_hash(pool_config["pool_fee_puzzle_hash"]))
 
         # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_target_puzzle_hash`
         self.wallet_fingerprint = pool_config["wallet_fingerprint"]
@@ -172,10 +171,10 @@ class Pool:
 
         self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
-            self_hostname, uint16(8555), DEFAULT_ROOT_PATH, self.config
+            self_hostname, uint16(58555), DEFAULT_ROOT_PATH, self.config
         )
         self.wallet_rpc_client = await WalletRpcClient.create(
-            self.config["self_hostname"], uint16(9256), DEFAULT_ROOT_PATH, self.config
+            self.config["self_hostname"], uint16(59256), DEFAULT_ROOT_PATH, self.config
         )
         self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
         res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
@@ -298,8 +297,10 @@ class Pool:
                         if singleton_coin_record is None:
                             continue
                         if singleton_coin_record.spent:
-                            self.log.warning(f"Singleton coin {singleton_coin_record.coin.name()} is spent, will not "
-                                             f"claim rewards")
+                            self.log.warning(
+                                f"Singleton coin {singleton_coin_record.coin.name()} is spent, will not "
+                                f"claim rewards"
+                            )
                             continue
 
                         spend_bundle = await create_absorb_transaction(
@@ -689,9 +690,7 @@ class Pool:
             # still keep track of this singleton if the farmer has changed to a different pool, in case they
             # switch back.
             self.log.info(f"Updating singleton state for {launcher_id}")
-            await self.store.update_singleton(
-                launcher_id, singleton_tip, singleton_tip_state, is_pool_member
-            )
+            await self.store.update_singleton(launcher_id, singleton_tip, singleton_tip_state, is_pool_member)
 
         if is_pool_member:
             return singleton_tip, singleton_tip_state
@@ -716,8 +715,10 @@ class Pool:
 
         # TODO (chia-dev): Check DB p2_singleton_puzzle_hash and compare
         # if partial.payload.proof_of_space.pool_contract_puzzle_hash != p2_singleton_puzzle_hash:
-        #     return error_response(PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH,
-        #                           f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}")
+        #     return error_response(
+        #       PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH,
+        #       f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}"
+        #     )
 
         async def get_signage_point_or_eos():
             if partial.payload.end_of_sub_slot:

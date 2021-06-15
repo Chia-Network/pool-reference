@@ -176,6 +176,8 @@ class Pool:
         )
         self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
         res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
+        if not res["success"]:
+            raise ValueError(f"Error logging in: {res['error']}. Make sure your config fingerprint is correct.")
         self.log.info(f"Logging in: {res}")
         res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
         self.log.info(f"Obtaining balance: {res}")

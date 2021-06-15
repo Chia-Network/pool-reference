@@ -73,6 +73,7 @@ The following errors may occur:
 | 0x0D | Invalid payout instructions |
 | 0x0E | Invalid singleton |
 | 0x0F | Delay time too short |
+| 0x10 | Request failed |
 
 ## GET /pool_info
 

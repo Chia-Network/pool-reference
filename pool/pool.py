@@ -102,13 +102,11 @@ class Pool:
         # be spent by this code! So only put funds that you want to distribute to pool members here.
 
         # Using 2164248527
-        self.default_target_puzzle_hash: bytes32 = bytes32(
-            decode_puzzle_hash(pool_config["default_target_puzzle_hash"])
-        )
+        self.default_target_puzzle_hash: bytes32 = bytes32(decode_puzzle_hash(pool_config["default_target_address"]))
 
         # The pool fees will be sent to this address. This MUST be on a different key than the target_puzzle_hash,
         # otherwise, the fees will be sent to the users. Using 690783650
-        self.pool_fee_puzzle_hash: bytes32 = bytes32(decode_puzzle_hash(pool_config["pool_fee_puzzle_hash"]))
+        self.pool_fee_puzzle_hash: bytes32 = bytes32(decode_puzzle_hash(pool_config["pool_fee_address"]))
 
         # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_target_puzzle_hash`
         self.wallet_fingerprint = pool_config["wallet_fingerprint"]

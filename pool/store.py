@@ -190,6 +190,14 @@ class PoolStore:
             (launcher_id.hex(), timestamp, difficulty),
         )
         await cursor.close()
+        cursor = await self.connection.execute(f"SELECT points from farmer where launcher_id=?", (launcher_id.hex(),))
+        row = await cursor.fetchone()
+        points = row[0]
+        await cursor.close()
+        cursor = await self.connection.execute(
+            f"UPDATE farmer set points=? where launcher_id=?", (points + difficulty, launcher_id.hex())
+        )
+        await cursor.close()
         await self.connection.commit()
 
     async def get_recent_partials(self, launcher_id: bytes32, count: int) -> List[Tuple[uint64, uint64]]:

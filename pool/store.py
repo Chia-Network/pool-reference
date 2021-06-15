@@ -132,9 +132,9 @@ class PoolStore:
         is_pool_member: bool,
     ):
         if is_pool_member:
-            entry = (bytes(singleton_tip), bytes(singleton_tip_state), 1, launcher_id)
+            entry = (bytes(singleton_tip), bytes(singleton_tip_state), 1, launcher_id.hex())
         else:
-            entry = (bytes(singleton_tip), bytes(singleton_tip_state), 0, launcher_id)
+            entry = (bytes(singleton_tip), bytes(singleton_tip_state), 0, launcher_id.hex())
         cursor = await self.connection.execute(
             f"UPDATE farmer SET singleton_tip=?, singleton_tip_state=?, is_pool_member=? WHERE launcher_id=?",
             entry,

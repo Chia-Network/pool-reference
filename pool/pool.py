@@ -696,7 +696,7 @@ class Pool:
             # This means the singleton has been changed in the blockchain (either by us or someone else). We
             # still keep track of this singleton if the farmer has changed to a different pool, in case they
             # switch back.
-            self.log.info(f"Updating singleton state for {launcher_id}")
+            self.log.info(f"Updating singleton state for {launcher_id} to {singleton_tip}")
             await self.store.update_singleton(launcher_id, singleton_tip, singleton_tip_state, is_pool_member)
 
         if is_pool_member:

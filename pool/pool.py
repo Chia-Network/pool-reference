@@ -719,10 +719,17 @@ class Pool:
         #     return error_response(PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH,
         #                           f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}")
 
-        if partial.payload.end_of_sub_slot:
-            response = await self.node_rpc_client.get_recent_signage_point_or_eos(None, partial.payload.sp_hash)
-        else:
-            response = await self.node_rpc_client.get_recent_signage_point_or_eos(partial.payload.sp_hash, None)
+        async def get_signage_point_or_eos():
+            if partial.payload.end_of_sub_slot:
+                return await self.node_rpc_client.get_recent_signage_point_or_eos(None, partial.payload.sp_hash)
+            else:
+                return await self.node_rpc_client.get_recent_signage_point_or_eos(partial.payload.sp_hash, None)
+
+        response = get_signage_point_or_eos()
+        if response is None:
+            # Try again after 10 seconds in case we just didn't yet receive the signage point
+            await asyncio.sleep(10)
+            response = get_signage_point_or_eos()
 
         if response is None or response["reverted"]:
             return error_response(

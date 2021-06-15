@@ -128,12 +128,13 @@ Allows to get the latest information for a farmer.
 Request parameter:
 ```
 - launcher_id
+- authentication_token
 - signature
 ```
 
 Example request:
 ```
-https://poolurl.com/farmer/launcher_id=:launcher_id&signature=:signature
+https://poolurl.com/farmer/launcher_id=:launcher_id&authentication_token=:token&signature=:signature
 ```
 
 Successful response:
@@ -141,8 +142,8 @@ Successful response:
 {
     "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
     "payout_instructions": "0xc2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
-    "difficulty": 10,
-    "points": 10
+    "current_difficulty": 10,
+    "current_points": 10
 }
 ```
 
@@ -150,11 +151,14 @@ Successful response:
 #### launcher_id
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
 
+#### authentication token
+The authentication token as described above.
+
 #### signature
 This is a BLS signature of the following message:
 
 ```
-[bytes32(launcher_id), uint32(authentication_token)]
+sha256(bytes32(launcher_id) + uint64(authentication_token))
 ```
 
 signed by the private key of the `owner_public_key` using the Augmented Scheme in the BLS IETF spec.

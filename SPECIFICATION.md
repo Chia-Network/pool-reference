@@ -162,7 +162,7 @@ This is a BLS signature of the following message:
 sha256(bytes32(launcher_id) + uint64(authentication_token))
 ```
 
-signed by the private key of the `owner_public_key` using the Augmented Scheme in the BLS IETF spec.
+signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS IETF spec.
 
 See [Farmer authentication](#farmer-authentication) for the specification of
 `authentication_token`.

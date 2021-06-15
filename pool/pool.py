@@ -153,7 +153,7 @@ class Pool:
 
         # We target these many partials for this number of seconds. We adjust after receiving this many partials.
         self.number_of_partials_target: int = pool_config["number_of_partials_target"]
-        self.time_target: int = 24 * 360
+        self.time_target: int = pool_config["time_target"]
 
         # Tasks (infinite While loops) for different purposes
         self.confirm_partials_loop_task: Optional[asyncio.Task] = None

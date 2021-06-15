@@ -77,11 +77,9 @@ To run a pool, you must use this along with a branch of `chia-blockchain`.
 1. Checkout the `pools.2021-may-25` branch of `chia-blockchain`, and install it. Checkout this repo in another
 directory next to (not inside) `chia-blockchain`. Make sure to be on testnet by doing `export CHIA_ROOT=".chia/testnet7"` and `chia configure --testnet true`.
 
-2. Create two keys, one which will be used for the block rewards from the blockchain, and the other
-which will receive the pool fee that is kept by the pool.
+2. Create three keys, one which will be used for the block rewards from the blockchain, one to receive the pool fee that is kept by the pool, and the third to be a wallet that acts as a test user.
 
-3. Change the `wallet_fingerprint` and `wallet_id` in the `config.yaml` config file, using the information from the first
-key you created in step 2. These can be obtained by doing `chia wallet show`.
+3. Change the `wallet_fingerprint` and `wallet_id` in the `pool-reference/config.yaml` config file, using the information from the first key you created in step 2. These can be obtained by doing `chia wallet show`.
 
 4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `config.yaml` 
 config file in `default_target_puzzle_hash` and `pool_fee_puzzle_hash` respectively.
@@ -96,6 +94,7 @@ increase POOL_SUB_SLOT_ITERS from 37600000000 to 37600000000 * (2**11). The defa
 
 7. Start the node using `chia start farmer`, and log in to a different key (not the two keys created for the pool). 
 This will be referred to as the farmer's key here. Sync up your wallet on testnet for the farmer key. 
+You can log in to a key by running `chia wallet show` and then choosing each wallet in turn, to make them start syncing.
 
 8. Create a venv (different from chia-blockchain) and start the pool server using the following commands:
 

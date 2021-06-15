@@ -174,6 +174,7 @@ Request:
 {
     "payload": {
         "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
+        "authentication_token": 27062279,
         "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
         "payout_instructions": "0xc2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
         "suggested_difficulty": 10
@@ -195,28 +196,30 @@ The successful response must always contain a welcome message which must be defi
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
 
 #### payload.authentication_public_key
-The public key of the authentication key, which is is a temporary key used by the farmer to sign all of their requests
+The public key of the authentication key, which is a temporary key used by the farmer to sign requests
 to the pool. It is an authorization given by the `owner_key`, so that the owner key can be potentially kept more secure.
-The timestamp is the time at which the `owner_key` approved this key, and therefore the `owner_key` can revoke older
-keys by issuing an authentication key with a new timestamp. The pool can accept partials with outdated
-`authentication_keys`, but the pool must not update the difficulty or the payout instructions.
+The pool should reject requests made with outdated `authentication_keys`. This key can be changed using `PUT /farmer`,
+which is signed with the owner key.
 
 #### payload.payout_instructions
 This is the instructions for how the farmer wants to get paid. By default this will be an XCH address, but it can
 be set to any string with a size of less than 1024 characters, so it can represent another blockchain or payment
-system identifier. If the farmer sends new instructions here, and the partial is fully valid, the pool should
-update the instructions for this farmer. However, this should only be done if the authentication public key is the
-most recent one seen for this farmer.
+system identifier.
 
 #### payload.suggested_difficulty
 A request from the farmer to update the difficulty. Can be ignored or respected by the pool. However, this should only
 be respected if the authentication public key is the most recent one seen for this farmer.
 
 #### signature
-This is a BLS signature of the following message:
+This is a BLS signature of the following message, streamed in Streamable format.
 
 ```
-[dict(payload), uint32(authentication_token)]
+class PostFarmerPayload(Streamable):
+    launcher_id: bytes32
+    authentication_token: uint64
+    authentication_public_key: G1Element
+    payout_instructions: str
+    suggested_difficulty: Optional[uint64]
 ```
 
 signed by the private key of the `owner_public_key` using the Augmented Scheme in the BLS IETF spec.
@@ -232,6 +235,7 @@ Request:
 {
     "payload": {
         "launcher_id": "0xae4ef3b9bfe68949691281a015a9c16630fc8f66d48c19ca548fb80768791afa",
+        "authentication_token": 27062279,
         "authentication_public_key": "0x970e181ae45435ae696508a78012dc80548c334cf29676ea6ade7049eb9d2b9579cc30cb44c3fd68d35a250cfbc69e29",
         "payout_instructions": "0xc2b08e41d766da4116e388357ed957d04ad754623a915f3fd65188a8746cf3e8",
         "suggested_difficulty": 10
@@ -242,7 +246,9 @@ Request:
 
 For a description of the request body entries see the corresponding keys in [POST /farmer](#post-farmer). The values
 provided with the key/value pairs are used to update the existing values. All entries, except `launcher_id`, are
-optional but there must be at least one of them.
+optional but there must be at least one of them. The signature is made on a slightly different payload: the arguments
+`authentication_public_key`, `payout_instructions`, and `suggested_difficulty`, are all Optionals in the streamable
+serialization, which means they must contain the prepended optional byte.
 
 Successful response:
 ```json

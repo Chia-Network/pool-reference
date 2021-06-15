@@ -23,7 +23,7 @@ from chia.util.hash import std_hash
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.consensus.constants import ConsensusConstants
 from chia.util.json_util import obj_to_response
-from chia.util.ints import uint16, uint64, uint32
+from chia.util.ints import uint8, uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 

@@ -45,7 +45,7 @@ from chia.pools.pool_puzzles import (
 from difficulty_adjustment import get_new_difficulty
 from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner
 from store import FarmerRecord, PoolStore
-from util import error_response
+from util import error_dict
 
 
 class Pool:
@@ -528,11 +528,11 @@ class Pool:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
 
-    async def add_farmer(self, request: PostFarmerRequest):
+    async def add_farmer(self, request: PostFarmerRequest) -> Dict:
         async with self.store.lock:
             farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(request.payload.launcher_id)
             if farmer_record is not None:
-                return error_response(
+                return error_dict(
                     PoolErrorCode.FARMER_ALREADY_KNOWN,
                     f"Farmer with launcher_id {request.payload.launcher_id} already known.",
                 )
@@ -542,7 +542,7 @@ class Pool:
             ] = await self.get_and_validate_singleton_state(request.payload.launcher_id)
 
             if singleton_state_tuple is None:
-                return error_response(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton, or not a pool member")
+                return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton, or not a pool member")
 
             last_spend, last_state = singleton_state_tuple
 
@@ -555,13 +555,13 @@ class Pool:
                 difficulty = request.payload.suggested_difficulty
 
             if len(hexstr_to_bytes(request.payload.payout_instructions)) != 32:
-                return error_response(
+                return error_dict(
                     PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS,
                     f"Payout instructions must be an xch address for this pool.",
                 )
 
             if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
-                return error_response(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
+                return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
             delay_time, delay_puzzle_hash = get_delayed_puz_info_from_launcher_spend(last_spend)
             p2_singleton_puzzle_hash = launcher_id_to_p2_puzzle_hash(
@@ -582,12 +582,12 @@ class Pool:
             self.scan_p2_singleton_puzzle_hashes.add(p2_singleton_puzzle_hash)
             await self.store.add_farmer_record(farmer_record)
 
-            return PostFarmerResponse(self.welcome_message)
+            return PostFarmerResponse(self.welcome_message).to_json_dict()
 
-    async def update_farmer(self, request: PutFarmerRequest):
+    async def update_farmer(self, request: PutFarmerRequest) -> Dict:
         farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(request.payload.launcher_id)
         if farmer_record is None:
-            return error_response(
+            return error_dict(
                 PoolErrorCode.FARMER_NOT_KNOWN, f"Farmer with launcher_id {request.payload.launcher_id} not known."
             )
 
@@ -597,10 +597,10 @@ class Pool:
         last_spend, last_state = singleton_state_tuple
 
         if singleton_state_tuple is None:
-            return error_response(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton, or not a pool member")
+            return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton, or not a pool member")
 
         if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
-            return error_response(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
+            return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
         farmer_dict = farmer_record.to_json_dict()
         response_dict = {}
@@ -633,7 +633,7 @@ class Pool:
         self.log.info(f"Updated farmer: {response_dict}")
         await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))
 
-        return PutFarmerResponse.from_json_dict(response_dict)
+        return PutFarmerResponse.from_json_dict(response_dict).from_json_dict()
 
     async def get_and_validate_singleton_state(self, launcher_id: bytes32) -> Optional[Tuple[CoinSolution, PoolState]]:
         """
@@ -708,14 +708,14 @@ class Pool:
         pk2: G1Element = farmer_record.authentication_public_key
         valid_sig = AugSchemeMPL.aggregate_verify([pk1, pk2], [message, message], partial.aggregate_signature)
         if not valid_sig:
-            return error_response(
+            return error_dict(
                 PoolErrorCode.INVALID_SIGNATURE,
                 f"The aggregate signature is invalid {partial.aggregate_signature}",
             )
 
         # TODO (chia-dev): Check DB p2_singleton_puzzle_hash and compare
         # if partial.payload.proof_of_space.pool_contract_puzzle_hash != p2_singleton_puzzle_hash:
-        #     return error_response(
+        #     return error_dict(
         #       PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH,
         #       f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}"
         #     )
@@ -733,7 +733,7 @@ class Pool:
             response = get_signage_point_or_eos()
 
         if response is None or response["reverted"]:
-            return error_response(
+            return error_dict(
                 PoolErrorCode.NOT_FOUND, f"Did not find signage point or EOS {partial.payload.sp_hash}, {response}"
             )
         node_time_received_sp = response["time_received"]
@@ -742,7 +742,7 @@ class Pool:
         end_of_sub_slot: Optional[EndOfSubSlotBundle] = response.get("eos", None)
 
         if time_received_partial - node_time_received_sp > self.partial_time_limit:
-            return error_response(
+            return error_dict(
                 PoolErrorCode.TOO_LATE,
                 f"Received partial in {time_received_partial - node_time_received_sp}. "
                 f"Make sure your proof of space lookups are fast, and network connectivity is good."
@@ -760,7 +760,7 @@ class Pool:
             self.constants, challenge_hash, partial.payload.sp_hash
         )
         if quality_string is None:
-            return error_response(PoolErrorCode.INVALID_PROOF, f"Invalid proof of space {partial.payload.sp_hash}")
+            return error_dict(PoolErrorCode.INVALID_PROOF, f"Invalid proof of space {partial.payload.sp_hash}")
 
         current_difficulty = farmer_record.difficulty
         required_iters: uint64 = calculate_iterations_quality(
@@ -772,7 +772,7 @@ class Pool:
         )
 
         if required_iters >= self.iters_limit:
-            return error_response(
+            return error_dict(
                 PoolErrorCode.PROOF_NOT_GOOD_ENOUGH,
                 f"Proof of space has required iters {required_iters}, too high for difficulty " f"{current_difficulty}",
             )

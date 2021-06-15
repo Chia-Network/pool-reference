@@ -153,8 +153,9 @@ Successful response:
 #### launcher_id
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
 
-#### authentication token
-The authentication token as described above.
+#### authentication_token
+See [Farmer authentication](#farmer-authentication) for the specification of
+`authentication_token`.
 
 #### signature
 This is a BLS signature of the following message:
@@ -165,8 +166,6 @@ sha256(bytes32(launcher_id) + uint64(authentication_token))
 
 signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS IETF spec.
 
-See [Farmer authentication](#farmer-authentication) for the specification of
-`authentication_token`.
 
 ## POST /farmer
 Allows farmers to make them known by the pool. This is required once before submitting the first partial.

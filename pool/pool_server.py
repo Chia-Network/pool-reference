@@ -98,7 +98,6 @@ class PoolServer:
     async def get_farmer(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
         launcher_id: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
-        target_puzzle_hash: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["target_puzzle_hash"])
         authentication_token = uint64(request_obj.rel_url.query["authentication_token"])
 
         authentication_token_error: Optional[web.Response] = check_authentication_token(
@@ -116,7 +115,7 @@ class PoolServer:
         # Validate provided signature
         signature: G2Element = G2Element.from_bytes(hexstr_to_bytes(request_obj.rel_url.query["signature"]))
         message: bytes32 = std_hash(
-            AuthenticationPayload("get_farmer", launcher_id, target_puzzle_hash, authentication_token)
+            AuthenticationPayload("get_farmer", launcher_id, self.pool.default_target_puzzle_hash, authentication_token)
         )
         if not AugSchemeMPL.verify(farmer_record.authentication_public_key, message, signature):
             return error_response(
@@ -207,7 +206,6 @@ class PoolServer:
     async def get_login(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
         launcher_id: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
-        target_puzzle_hash: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["target_puzzle_hash"])
         authentication_token: uint64 = uint64(request_obj.rel_url.query["authentication_token"])
         authentication_token_error = check_authentication_token(
             launcher_id, authentication_token, self.pool.authentication_token_timeout
@@ -224,7 +222,7 @@ class PoolServer:
         # Validate provided signature
         signature: G2Element = G2Element.from_bytes(hexstr_to_bytes(request_obj.rel_url.query["signature"]))
         message: bytes32 = std_hash(
-            AuthenticationPayload("get_login", launcher_id, target_puzzle_hash, authentication_token)
+            AuthenticationPayload("get_login", launcher_id, self.pool.default_target_puzzle_hash, authentication_token)
         )
         if not AugSchemeMPL.verify(farmer_record.authentication_public_key, message, signature):
             return error_response(

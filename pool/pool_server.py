@@ -240,7 +240,7 @@ class PoolServer:
         if record is not None:
             response["farmer_record"] = record
             recent_partials = await self.pool.store.get_recent_partials(launcher_id, 20)
-            response["recent_partials"] = None
+            response["recent_partials"] = recent_partials
 
         # TODO(pool) Do what ever you like with the successful login
         return obj_to_response(response)

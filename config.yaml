@@ -3,13 +3,15 @@ pool_info:
   name: The Reference Pool
   logo_url: https://www.chia.net/img/chia_logo.svg
   description: (example) The Reference Pool allows you to pool with low fees, paying out daily using Chia.
+welcome_message: "Welcome to the reference pool!"
 pool_fee: 0.01
 pool_url: http://10.0.0.45
 min_difficulty: 10
 default_difficulty: 10
-default_target_puzzle_hash: txch16mhvz4cpzwq9dmds5lkjk22h34wftcc0xx728zmqwnla2wy2gl0qancuzs
-pool_fee_puzzle_hash: txch1ww8m7ttxuc2ng6qlthk609hkrt25mklcuqn882rkngnygeuu8fks36ckvs
-wallet_fingerprint: 2164248527
+default_target_address: txch1h8vdax8vtspx7yt8kz6cwu2awymlgwmdr4qts8v643kusd2lmc5qht7ltq
+pool_fee_address: txch1jhydnk47xl40jn3pgwjd708uk2wqzqexagy9xxjcwt2qeaumv3fqcrw6e2
+wallet_fingerprint: 3967641394
+authentication_token_timeout: 5
 wallet_id: 1
 partial_time_limit: 25
 partial_confirmation_delay: 30
@@ -18,4 +20,5 @@ collect_pool_rewards_interval: 600
 confirmation_security_threshold: 6
 payment_interval: 600
 max_additions_per_transaction: 400
-number_of_partials_target: 30
+number_of_partials_target: 50
+time_target: 8640

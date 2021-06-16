@@ -16,6 +16,7 @@ from chia.protocols.pool_protocol import (
     PutFarmerRequest,
     validate_authentication_token,
     POOL_PROTOCOL_VERSION,
+    AuthenticationPayload,
 )
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.byte_types import hexstr_to_bytes
@@ -96,7 +97,8 @@ class PoolServer:
 
     async def get_farmer(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
-        launcher_id = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
+        launcher_id: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
+        target_puzzle_hash: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["target_puzzle_hash"])
         authentication_token = uint64(request_obj.rel_url.query["authentication_token"])
 
         authentication_token_error: Optional[web.Response] = check_authentication_token(
@@ -113,7 +115,9 @@ class PoolServer:
 
         # Validate provided signature
         signature: G2Element = G2Element.from_bytes(hexstr_to_bytes(request_obj.rel_url.query["signature"]))
-        message = std_hash(launcher_id + bytes(authentication_token))
+        message: bytes32 = std_hash(
+            AuthenticationPayload("get_farmer", launcher_id, target_puzzle_hash, authentication_token)
+        )
         if not AugSchemeMPL.verify(farmer_record.authentication_public_key, message, signature):
             return error_response(
                 PoolErrorCode.INVALID_SIGNATURE,
@@ -202,8 +206,9 @@ class PoolServer:
 
     async def get_login(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
-        launcher_id = request_obj.rel_url.query["launcher_id"]
-        authentication_token = request_obj.rel_url.query["authentication_token"]
+        launcher_id: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
+        target_puzzle_hash: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["target_puzzle_hash"])
+        authentication_token: uint64 = uint64(request_obj.rel_url.query["authentication_token"])
         authentication_token_error = check_authentication_token(
             launcher_id, authentication_token, self.pool.authentication_token_timeout
         )
@@ -212,21 +217,32 @@ class PoolServer:
 
         farmer_record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(launcher_id)
         if farmer_record is None:
-            return error_response(PoolErrorCode.FARMER_NOT_KNOWN, f"Farmer with launcher_id {launcher_id} unknown.")
+            return error_response(
+                PoolErrorCode.FARMER_NOT_KNOWN, f"Farmer with launcher_id {launcher_id.hex()} unknown."
+            )
 
         # Validate provided signature
-        signature = request_obj.rel_url.query["signature"]
-        message = std_hash(launcher_id + bytes(authentication_token))
+        signature: G2Element = G2Element.from_bytes(hexstr_to_bytes(request_obj.rel_url.query["signature"]))
+        message: bytes32 = std_hash(
+            AuthenticationPayload("get_login", launcher_id, target_puzzle_hash, authentication_token)
+        )
         if not AugSchemeMPL.verify(farmer_record.authentication_public_key, message, signature):
             return error_response(
                 PoolErrorCode.INVALID_SIGNATURE,
-                f"Failed to verify signature {signature} for launcher_id {launcher_id}.",
+                f"Failed to verify signature {signature} for launcher_id {launcher_id.hex()}.",
             )
 
-        self.pool.log.info(f"Login successful for launcher_id: {launcher_id}")
+        self.pool.log.info(f"Login successful for launcher_id: {launcher_id.hex()}")
+
+        record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(launcher_id)
+        response = {}
+        if record is not None:
+            response["farmer_record"] = record
+            recent_partials = await self.pool.store.get_recent_partials(launcher_id, 20)
+            response["recent_partials"] = recent_partials
 
         # TODO(pool) Do what ever you like with the successful login
-        return obj_to_response({"login_data", "Put server side login information here?"})
+        return obj_to_response(response)
 
 
 server: Optional[PoolServer] = None

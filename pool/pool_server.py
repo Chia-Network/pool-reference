@@ -7,7 +7,6 @@ from typing import Dict, Callable, Optional
 import aiohttp
 from blspy import AugSchemeMPL, PrivateKey, G2Element
 from aiohttp import web
-from chia.pools.pool_wallet_info import POOL_PROTOCOL_VERSION
 from chia.protocols.pool_protocol import (
     PoolErrorCode,
     GetFarmerResponse,
@@ -16,6 +15,7 @@ from chia.protocols.pool_protocol import (
     PostFarmerRequest,
     PutFarmerRequest,
     validate_authentication_token,
+    POOL_PROTOCOL_VERSION,
 )
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.byte_types import hexstr_to_bytes
@@ -86,7 +86,7 @@ class PoolServer:
             self.pool.info_logo_url,
             uint64(self.pool.min_difficulty),
             uint32(self.pool.relative_lock_height),
-            str(POOL_PROTOCOL_VERSION),
+            POOL_PROTOCOL_VERSION,
             str(self.pool.pool_fee),
             self.pool.info_description,
             self.pool.default_target_puzzle_hash,

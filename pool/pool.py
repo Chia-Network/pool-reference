@@ -10,7 +10,7 @@ import os
 import yaml
 
 from blspy import AugSchemeMPL, PrivateKey, G1Element
-from chia.pools.pool_wallet_info import PoolState, PoolSingletonState, POOL_PROTOCOL_VERSION
+from chia.pools.pool_wallet_info import PoolState, PoolSingletonState
 from chia.protocols.pool_protocol import (
     PoolErrorCode,
     PostPartialRequest,
@@ -19,6 +19,7 @@ from chia.protocols.pool_protocol import (
     PostFarmerResponse,
     PutFarmerRequest,
     PutFarmerResponse,
+    POOL_PROTOCOL_VERSION,
 )
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin

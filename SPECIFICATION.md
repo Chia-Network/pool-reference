@@ -1,7 +1,7 @@
 # Chia Pool Protocol 1.0
 
-This is the initial version of the Chia Pool Protocol. It has been designed to be simple, and to be extended later.
-It relies on farmers having smart coins (referred to as Pool NFT in GUI + CLI) which allow them to switch between pools
+This is the initial version of the Chia Pool Protocol. It is designed to be simple, and to be extended later.
+It relies on farmers having smart coins (referred to as Pool NFTs in GUI + CLI) which allow them to switch between pools
 by making transactions on the blockchain. Furthermore, it decreases the reliance on pools for block production, since
 the protocol only handles distribution of rewards, and it protects against pools or farmers acting maliciously.
 
@@ -15,12 +15,13 @@ to run a full node, they can configure their node to connect to a remote full no
 A pool operator can support any number of farmers.
 
 ## Farmer identification
-A farmer is uniquely identified by the identifier of the farmers singleton on the blockchain, this is what `launcher_id` refers
-to. The `launcher_id` can be used as a primary key. The pool must periodically check the singleton on the blockchain to
-validate that it's farming to the pool, and not leaving or farming to another pool.
+A farmer can be uniquely identified by the identifier of the farmer's singleton on the blockchain, this is what
+`launcher_id` refers to. The `launcher_id` can be used as a primary key in a database. The pool must periodically check
+the singleton's state on the blockchain to validate that it's farming to the pool, and not leaving or farming to another
+pool.
 
 ## Farmer authentication
-For the farmer to authenticate at the pool the following time based authentication token scheme must be added to the
+For the farmer to authenticate to the pool the following time based authentication token scheme must be added to the
 signing messages of some endpoints.
 
 ```
@@ -77,7 +78,7 @@ The following errors may occur:
 
 ## Signature validation
 
-Most of the endpoints require signature a validation. The validation requires serialization of the endpoints payloads
+Most of the endpoints require signature validation. The validation requires serialization of the endpoints payloads
 to calculate the message hash which is done like:
 
 ```
@@ -86,6 +87,7 @@ message_hash = sha256(serialized_payload)
 
 The serialized payload must follow the `Streamable` standard defined
 [here](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/util/streamable.py).
+
 ## GET /pool_info
 
 This takes no arguments, and allows clients to fetch information about a pool. It is called right before joining a pool,
@@ -111,7 +113,8 @@ scripts and JS injections. It returns a JSON response with the following data:
 The description is a short paragraph that can be displayed in GUIs when the farmer enters a pool URL.
 
 #### fee
-The fee that the pool charges by default, a number between 0 (0%) and 1 (100%). This does not include blockchain transaction fees.
+The fee that the pool charges by default, a number between 0.0 (0.0%) and 1.0 (100.0%). This does not include blockchain
+transaction fees.
 
 #### logo_url
 A URL for a pool logo that the client can display in the UI. This is optional for v1.0.
@@ -127,16 +130,16 @@ The pool protocol version supported by the pool.
 
 #### relative_lock_height
 The number of blocks (confirmations) that a user must wait between the point when they start escaping a pool, and the
-point at which they can finalize their pool switch. Must be less than 4608 (24 hours).
+point at which they can finalize their pool switch. Must be less than 4608 (approximately 24 hours).
 
 #### target_puzzle_hash
 This is the target of where rewards will be sent to from the singleton. Controlled by the pool.
 
 #### authentication_token_timeout
-The time in minutes for a `authentication_token` to be valid, see [Farmer authentication](#farmer-authentication).
+The time in **minutes** for an `authentication_token` to be valid, see [Farmer authentication](#farmer-authentication).
 
 ## GET /farmer
-Allows to get the latest information for a farmer.
+Get the latest information for a farmer.
 
 Request parameter:
 ```
@@ -188,7 +191,7 @@ signature must be signed by the private key of the `authentication_public_key` u
 IETF spec.
 
 ## POST /farmer
-Allows farmers to make them known by the pool. This is required once before submitting the first partial.
+Register a farmer with the pool. This is required once before submitting the first partial.
 
 Request:
 ```json
@@ -209,7 +212,7 @@ Successful response:
 {"welcome_message" : "Welcome to the reference pool. Happy farming."}
 ```
 
-The successful response must always contain a welcome message which must be defined by the pool.
+A successful response must always contain a welcome message which must be defined by the pool.
 
 #### payload
 
@@ -222,18 +225,20 @@ See [Farmer authentication](#farmer-authentication) for the specification of
 
 #### payload.authentication_public_key
 The public key of the authentication key, which is a temporary key used by the farmer to sign requests
-to the pool. It is an authorization given by the `owner_key`, so that the owner key can be potentially kept more secure.
-The pool should reject requests made with outdated `authentication_keys`. This key can be changed using `PUT /farmer`,
-which is signed with the owner key.
+to the pool. It is authorized by the `owner_key`, so that the owner key can be kept more secure. The pool should reject
+requests made with outdated `authentication_keys`. These key can be changed using `PUT /farmer`, which is signed with
+the owner key.
 
 #### payload.payout_instructions
-This is the instructions for how the farmer wants to get paid. By default this will be an XCH address, but it can
+These are the instructions for how the farmer wants to get paid. By default this will be an XCH address, but it can
 be set to any string with a size of less than 1024 characters, so it can represent another blockchain or payment
 system identifier.
 
 #### payload.suggested_difficulty
 A request from the farmer to update the difficulty. Can be ignored or respected by the pool. However, this should only
 be respected if the authentication public key is the most recent one seen for this farmer.
+
+See [Difficulty](#difficulty) for more details about the impact of the difficulty.
 
 #### signature
 This is a BLS signature of the hashed serialization of the payload:
@@ -266,8 +271,8 @@ Request:
 ```
 
 For a description of the request body entries see the corresponding keys in [POST /farmer](#post-farmer). The values
-provided with the key/value pairs are used to update the existing values. All entries, except `launcher_id`, are
-optional but there must be at least one of them. 
+provided with the key/value pairs are used to update the existing values on the server. All entries, except
+`launcher_id`, are optional but there must be at least one of them. 
 
 See the [streamable](#signature-validation) class `PutFarmerPayload` in the
 [pool protocol](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/protocols/pool_protocol.py) for details
@@ -283,7 +288,7 @@ Successful response:
 }
 ```
 
-The successful response must always contain one key/value pair for each entry provided in the request body. The value
+A successful response must always contain one key/value pair for each entry provided in the request body. The value
 must be `true` if the entry has been updated or `false` if the value was the same as the current value.
 
 See below for an example body to only update the authentication key:
@@ -328,7 +333,7 @@ Successful response:
 { "new_difficulty": 10}
 ```
 
-The successful response must always contain the new difficulty which should be respected by the farmer.
+A successful response must always contain the new difficulty which must be respected by the farmer.
 
 #### payload
 This is the main payload of the partial, which is signed by two keys: `authentication_key` and `plot_key`.
@@ -337,8 +342,7 @@ This is the main payload of the partial, which is signed by two keys: `authentic
 The unique identifier of the farmer's singleton, see [Farmer identification](#farmer-identification).
 
 #### payload.authentication_token
-See [Farmer authentication](#farmer-authentication) for the specification of
-`authentication_token`.
+See [Farmer authentication](#farmer-authentication) for the specification of `authentication_token`.
 
 #### payload.proof_of_space
 The proof of space in chia-blockchain format.
@@ -347,7 +351,7 @@ The proof of space in chia-blockchain format.
 The challenge of the proof of space, computed from the signage point or end of subslot.
 
 #### payload.proof_of_space.pool_contract_puzzle_hash
-The puzzle hash that is encoded in the plots, equivalent to the `p2_singleton_puzzle_hash`. This is the first place
+The puzzle hash that is encoded in the plots, equivalent to the `p2_singleton_puzzle_hash`. This is the first address
 that the 7/8 rewards get paid out to in the blockchain, if this proof wins. This value can be derived from the
 `launcher_id`, and must be valid for all partials.
 
@@ -418,7 +422,7 @@ See [Farmer authentication](#farmer-authentication) for the specification of
 `authentication_token`.
 
 #### target_puzzle_hash
-The pools target puzzle hash, see [GET /pool_info](#get-pool_info)
+The pool's target puzzle hash, see [GET /pool_info](#get-pool_info)
 
 #### signature
 This is a BLS signature of the hashed serialization of the following data in the given order:

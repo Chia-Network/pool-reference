@@ -393,7 +393,7 @@ A partial must be completely rejected if the BLS signature does not validate.
 
 ## GET /login
 This allows the user to log in to a web interface if the pool supports it, see service flags in
-[GET /pool_info](#get-pool_info).  The farmer software must offer a way to generate and display a login link or provide 
+[GET /pool_info](#get-pool_info). The farmer software must offer a way to generate and display a login link or provide 
 a button which generates the link and then just opens it in the default browser. The link follows the specification
 below.
 

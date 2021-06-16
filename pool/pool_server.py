@@ -97,7 +97,6 @@ class PoolServer:
 
     async def get_farmer(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
-        self.log.warning(f"Got: {request_obj.rel_url.query}")
         launcher_id: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
         target_puzzle_hash: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["target_puzzle_hash"])
         authentication_token = uint64(request_obj.rel_url.query["authentication_token"])

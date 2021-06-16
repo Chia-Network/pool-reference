@@ -141,13 +141,14 @@ Allows to get the latest information for a farmer.
 Request parameter:
 ```
 - launcher_id
+- target_puzzle_hash
 - authentication_token
 - signature
 ```
 
 Example request:
 ```
-https://poolurl.com/farmer/launcher_id=:launcher_id&authentication_token=:token&signature=:signature
+https://poolurl.com/farmer/launcher_id=:launcher_id&target_puzzle_hash=:puzzle_hash&authentication_token=:token&signature=:signature
 ```
 
 Successful response:
@@ -174,6 +175,7 @@ This is a BLS signature of the hashed serialization of the following data in the
 |Element|Type|
 |---|---|
 |launcher_id | bytes32 |
+|target_puzzle_hash | bytes32 |
 |authentication_token | uint64 |
 
 where the parameter must be serialized and hashed according to [Signature validation](#signature-validation) and the

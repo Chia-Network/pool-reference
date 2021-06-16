@@ -330,7 +330,7 @@ Request:
 
 Successful response:
 ```json
-{ "new_difficulty": 10}
+{"new_difficulty": 10}
 ```
 
 A successful response must always contain the new difficulty which must be respected by the farmer.

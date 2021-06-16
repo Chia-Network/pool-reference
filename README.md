@@ -79,7 +79,8 @@ directory next to (not inside) `chia-blockchain`. Make sure to be on testnet by 
 
 2. Create three keys, one which will be used for the block rewards from the blockchain, one to receive the pool fee that is kept by the pool, and the third to be a wallet that acts as a test user.
 
-3. Change the `wallet_fingerprint` and `wallet_id` in the `pool-reference/config.yaml` config file, using the information from the first key you created in step 2. These can be obtained by doing `chia wallet show`.
+3. Change the `wallet_fingerprint` and `wallet_id` in the `config.yaml` config file, using the information from the first
+key you created in step 2. These can be obtained by doing `chia wallet show`.
 
 4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `config.yaml` 
 config file in `default_target_address` and `pool_fee_address` respectively.
@@ -118,10 +119,9 @@ You can make plots by specifying the -c argument in `chia plots create`. Make su
  You can start with small k25 plots and see if partials are submitted from the farmer to the pool server. The output
 will be the following in the pool if everything is working:
 ```
-INFO:root:Returning {'points_balance': 82629918227, 'current_difficulty': 1963211364}, time: 0.017535686492919922 singleton: 0x1f8dab79a614a82f9834c8f395f5fe195ae020807169b71a10218b9788a7a573
+INFO:root:Returning {'current_difficulty': 1963211364}, time: 0.017535686492919922 singleton: 0x1f8dab79a614a82f9834c8f395f5fe195ae020807169b71a10218b9788a7a573
 ```
     
-Note that switching pools is still not enabled, but will be added very shortly. Please
-send a message to @sorgente711 on keybase if you have questions about the 9 steps explained above. All other questions
+Please send a message to @sorgente711 on keybase if you have questions about the 9 steps explained above. All other questions
 should be send to the #pools channel in keybase. 
 

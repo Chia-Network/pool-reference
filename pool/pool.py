@@ -814,5 +814,6 @@ class Pool:
 
                 if current_difficulty != new_difficulty:
                     await self.store.update_difficulty(partial.payload.launcher_id, new_difficulty)
+                    current_difficulty = new_difficulty
 
         return PostPartialResponse(current_difficulty).to_json_dict()

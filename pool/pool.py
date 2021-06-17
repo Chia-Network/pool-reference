@@ -644,8 +644,23 @@ class Pool:
             if is_new_value:
                 farmer_dict["suggested_difficulty"] = request.payload.suggested_difficulty
 
-        self.log.info(f"Updated farmer: {response_dict}")
-        await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))
+        async def update_farmer_later():
+            await asyncio.sleep(300)
+            if (
+                request.payload.launcher_id in self.farmer_update_time
+                and (int(time.time()) - self.farmer_update_time[request.payload.launcher_id]) < 600
+            ):
+                return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
+            await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))
+            self.log.info(f"Updated farmer: {response_dict}")
+
+        if (
+            request.payload.launcher_id in self.farmer_update_time
+            and (int(time.time()) - self.farmer_update_time[request.payload.launcher_id]) < 600
+        ):
+            return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
+
+        await asyncio.create_task(update_farmer_later())
 
         return PutFarmerResponse.from_json_dict(response_dict).from_json_dict()
 

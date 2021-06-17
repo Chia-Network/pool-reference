@@ -144,14 +144,13 @@ Get the latest information for a farmer.
 Request parameter:
 ```
 - launcher_id
-- target_puzzle_hash
 - authentication_token
 - signature
 ```
 
 Example request:
 ```
-https://poolurl.com/farmer/launcher_id=:launcher_id&target_puzzle_hash=:puzzle_hash&authentication_token=:token&signature=:signature
+https://poolurl.com/farmer/launcher_id=:launcher_id&authentication_token=:token&signature=:signature
 ```
 
 Successful response:
@@ -404,13 +403,12 @@ Request parameters:
 ```
 - launcher_id
 - authentication_token
-- target_puzzle_hash
 - signature
 ```
 
 Example request:
 ```
-https://poolurl.com/login?launcher_id=:launcher_id&authentication_token=:token&target_puzzle_hash=:puzzle_hash&signature=:signature
+https://poolurl.com/login?launcher_id=:launcher_id&authentication_token=:token&signature=:signature
 ```
 
 #### launcher_id

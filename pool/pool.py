@@ -642,7 +642,7 @@ class Pool:
             )
             response_dict["suggested_difficulty"] = is_new_value
             if is_new_value:
-                farmer_dict["suggested_difficulty"] = request.payload.suggested_difficulty
+                farmer_dict["difficulty"] = request.payload.suggested_difficulty
 
         self.log.info(f"Updated farmer: {response_dict}")
         await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))

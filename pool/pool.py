@@ -602,14 +602,13 @@ class Pool:
             return PostFarmerResponse(self.welcome_message).to_json_dict()
 
     async def update_farmer(self, request: PutFarmerRequest) -> Dict:
-        farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(request.payload.launcher_id)
+        launcher_id = request.payload.launcher_id
+        farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(launcher_id)
         if farmer_record is None:
-            return error_dict(
-                PoolErrorCode.FARMER_NOT_KNOWN, f"Farmer with launcher_id {request.payload.launcher_id} not known."
-            )
+            return error_dict(PoolErrorCode.FARMER_NOT_KNOWN, f"Farmer with launcher_id {launcher_id} not known.")
 
         singleton_state_tuple: Optional[Tuple[CoinSolution, PoolState]] = await self.get_and_validate_singleton_state(
-            request.payload.launcher_id
+            launcher_id
         )
         last_spend, last_state = singleton_state_tuple
 
@@ -650,17 +649,14 @@ class Pool:
         async def update_farmer_later():
             await asyncio.sleep(300)
             if (
-                request.payload.launcher_id in self.farmer_update_time
-                and (int(time.time()) - self.farmer_update_time[request.payload.launcher_id]) < 600
+                launcher_id in self.farmer_update_time
+                and (int(time.time()) - self.farmer_update_time[launcher_id]) < 600
             ):
                 return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
             await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))
             self.log.info(f"Updated farmer: {response_dict}")
 
-        if (
-            request.payload.launcher_id in self.farmer_update_time
-            and (int(time.time()) - self.farmer_update_time[request.payload.launcher_id]) < 600
-        ):
+        if launcher_id in self.farmer_update_time and (int(time.time()) - self.farmer_update_time[launcher_id]) < 600:
             return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
 
         await asyncio.create_task(update_farmer_later())

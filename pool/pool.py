@@ -604,6 +604,10 @@ class Pool:
 
     async def update_farmer(self, request: PutFarmerRequest) -> Dict:
         launcher_id = request.payload.launcher_id
+        # First check if this launcher_id is currently blocked for farmer updates, if so there is no reason to validate
+        # all the stuff below
+        if launcher_id in self.farmer_update_blocked:
+            return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
         farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(launcher_id)
         if farmer_record is None:
             return error_dict(PoolErrorCode.FARMER_NOT_KNOWN, f"Farmer with launcher_id {launcher_id} not known.")
@@ -652,9 +656,6 @@ class Pool:
             await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))
             self.farmer_update_blocked.remove(launcher_id)
             self.log.info(f"Updated farmer: {response_dict}")
-
-        if launcher_id in self.farmer_update_blocked:
-            return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
 
         self.farmer_update_blocked.add(launcher_id)
         await asyncio.create_task(update_farmer_later())

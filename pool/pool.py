@@ -122,8 +122,9 @@ class Pool:
         # reorg. That is why we have a time delay before changing any account points.
         self.partial_confirmation_delay: int = pool_config["partial_confirmation_delay"]
 
-        # The times of the last PUT /farmer per launcher_id, used to prevent difficulty change attacks
-        self.farmer_update_time: dict = {}
+        # Only allow PUT /farmer per launcher_id every n seconds to prevent difficulty change attacks.
+        self.farmer_update_blocked: set = set()
+        self.farmer_update_cooldown_seconds: int = 600
 
         # These are the phs that we want to look for on chain, that we can claim to our pool
         self.scan_p2_singleton_puzzle_hashes: Set[bytes32] = set()
@@ -647,18 +648,15 @@ class Pool:
                 farmer_dict["suggested_difficulty"] = request.payload.suggested_difficulty
 
         async def update_farmer_later():
-            await asyncio.sleep(300)
-            if (
-                launcher_id in self.farmer_update_time
-                and (int(time.time()) - self.farmer_update_time[launcher_id]) < 600
-            ):
-                return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
+            await asyncio.sleep(self.farmer_update_cooldown_seconds)
             await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))
+            self.farmer_update_blocked.remove(launcher_id)
             self.log.info(f"Updated farmer: {response_dict}")
 
-        if launcher_id in self.farmer_update_time and (int(time.time()) - self.farmer_update_time[launcher_id]) < 600:
+        if launcher_id in self.farmer_update_blocked:
             return error_dict(PoolErrorCode.REQUEST_FAILED, f"Cannot update farmer yet.")
 
+        self.farmer_update_blocked.add(launcher_id)
         await asyncio.create_task(update_farmer_later())
 
         return PutFarmerResponse.from_json_dict(response_dict).from_json_dict()

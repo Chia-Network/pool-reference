@@ -122,6 +122,9 @@ class Pool:
         # reorg. That is why we have a time delay before changing any account points.
         self.partial_confirmation_delay: int = pool_config["partial_confirmation_delay"]
 
+        # The times of the last PUT /farmer per launcher_id, used to prevent difficulty change attacks
+        self.farmer_update_time: dict = {}
+
         # These are the phs that we want to look for on chain, that we can claim to our pool
         self.scan_p2_singleton_puzzle_hashes: Set[bytes32] = set()
 

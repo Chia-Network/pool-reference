@@ -85,7 +85,7 @@ key you created in step 2. These can be obtained by doing `chia wallet show`.
 4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `config.yaml` 
 config file in `default_target_address` and `pool_fee_address` respectively.
    
-5. Change the pool_url in pool.py to point to your external ip or hostname. 
+5. Change the `pool_url` in `config.yaml` to point to your external ip or hostname. 
    This must match exactly with what the user enters into their UI or CLI, and must start with https://. For now
    http:// can also be used.
    

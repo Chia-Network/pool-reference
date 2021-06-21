@@ -71,8 +71,6 @@ class Pool:
         self.public_key: G1Element = private_key.get_g1()
         self.config = config
         self.constants = constants
-        self.node_rpc_client = None
-        self.wallet_rpc_client = None
 
         self.store: Optional[PoolStore] = None
 

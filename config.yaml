@@ -13,6 +13,8 @@ pool_fee_address: txch1jhydnk47xl40jn3pgwjd708uk2wqzqexagy9xxjcwt2qeaumv3fqcrw6e
 wallet_fingerprint: 3967641394
 authentication_token_timeout: 5
 wallet_id: 1
+node_rpc_port: 8555
+wallet_rpc_port: 9256
 partial_time_limit: 25
 partial_confirmation_delay: 30
 scan_start_height: 1000

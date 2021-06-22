@@ -719,9 +719,14 @@ class Pool:
         elif singleton_tip_state.version != POOL_PROTOCOL_VERSION:
             self.log.info(f"Wrong version {singleton_tip_state.version}")
             is_pool_member = False
-        elif singleton_tip_state.state != PoolSingletonState.FARMING_TO_POOL.value:
+        elif singleton_tip_state.state == PoolSingletonState.SELF_POOLING.value:
             self.log.info(f"Invalid singleton state {singleton_tip_state.state}")
             is_pool_member = False
+        elif singleton_tip_state.state == PoolSingletonState.LEAVING_POOL.value:
+            coin_record: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(singleton_tip.coin)
+            assert coin_record is not None
+            if self.blockchain_state["peak"].height - coin_record.confirmed_block_index > self.relative_lock_height:
+                is_pool_member = False
 
         self.log.info(f"Is {launcher_id} pool member: {is_pool_member}")
 

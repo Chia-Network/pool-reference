@@ -8,6 +8,7 @@ from chia.pools.pool_puzzles import (
     solution_to_extra_data,
     get_most_recent_singleton_coin_from_coin_solution,
 )
+from chia.pools.pool_wallet import PoolSingletonState
 from chia.pools.pool_wallet_info import PoolState
 from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.types.blockchain_format.coin import Coin
@@ -106,6 +107,11 @@ async def create_absorb_transaction(
         log.info(f"Invalid singleton {farmer_record.launcher_id}.")
         return None
     last_solution, last_state = singleton_state_tuple
+
+    if last_state.state == PoolSingletonState.SELF_POOLING:
+        log.info(f"Don't try to absorb from former farmer {farmer_record.launcher_id}.")
+        return None
+
     launcher_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(
         farmer_record.launcher_id
     )

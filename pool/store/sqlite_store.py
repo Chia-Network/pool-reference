@@ -9,7 +9,7 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_solution import CoinSolution
 from chia.util.ints import uint64
 
-from record import FarmerRecord
+from ..record import FarmerRecord
 
 
 class PoolStore:

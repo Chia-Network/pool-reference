@@ -44,7 +44,7 @@ from chia.pools.pool_puzzles import (
 )
 
 from difficulty_adjustment import get_new_difficulty
-from singleton import create_absorb_transaction, get_and_validate_singleton_state_inner, get_coin_spend
+from singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
 from store import FarmerRecord, PoolStore
 from util import error_dict
 
@@ -670,49 +670,50 @@ class Pool:
         """
         singleton_task: Optional[Task] = self.follow_singleton_tasks.get(launcher_id, None)
         remove_after = False
+        farmer_rec = None
         if singleton_task is None or singleton_task.done():
             farmer_rec: Optional[FarmerRecord] = await self.store.get_farmer_record(launcher_id)
-            peak_height: uint32 = self.blockchain_state["peak"].height
-            if farmer_rec is None:
-                desired_state: PoolState = PoolState(
-                    POOL_PROTOCOL_VERSION,
-                    PoolSingletonState.FARMING_TO_POOL.value,
-                    self.default_target_puzzle_hash,
-                    G1Element(),
-                    self.pool_url,
-                    self.relative_lock_height,
-                )
-            else:
-                desired_state = PoolState(
-                    POOL_PROTOCOL_VERSION,
-                    PoolSingletonState.FARMING_TO_POOL.value,
-                    self.default_target_puzzle_hash,
-                    farmer_rec.singleton_tip_state.owner_pubkey,
-                    self.pool_url,
-                    self.relative_lock_height,
-                )
             singleton_task = asyncio.create_task(
-                get_and_validate_singleton_state_inner(
+                get_singleton_state(
                     self.node_rpc_client,
                     launcher_id,
                     farmer_rec,
-                    peak_height,
+                    self.blockchain_state["peak"].height,
                     self.confirmation_security_threshold,
-                    desired_state,
                 )
             )
             self.follow_singleton_tasks[launcher_id] = singleton_task
             remove_after = True
 
-        optional_result: Optional[Tuple[CoinSolution, PoolState, bool, bool]] = await singleton_task
+        optional_result: Optional[Tuple[CoinSolution, PoolState]] = await singleton_task
         if remove_after and launcher_id in self.follow_singleton_tasks:
             await self.follow_singleton_tasks.pop(launcher_id)
 
         if optional_result is None:
             return None
 
-        singleton_tip, singleton_tip_state, updated, is_pool_member = optional_result
-        if updated and remove_after:
+        singleton_tip, singleton_tip_state = optional_result
+
+        # Validate state of the singleton
+        is_pool_member = True
+        if singleton_tip_state.target_puzzle_hash != self.default_target_puzzle_hash:
+            self.log.info(f"Wrong target puzzle hash: {singleton_tip_state.target_puzzle_hash}")
+            is_pool_member = False
+        elif singleton_tip_state.relative_lock_height != self.relative_lock_height:
+            self.log.info(f"Wrong relative lock height: {singleton_tip_state.relative_lock_height}")
+            is_pool_member = False
+        elif singleton_tip_state.version != POOL_PROTOCOL_VERSION:
+            self.log.info(f"Wrong version {singleton_tip_state.version}")
+            is_pool_member = False
+        elif singleton_tip_state.state != PoolSingletonState.FARMING_TO_POOL.value:
+            self.log.info(f"Invalid singleton state {singleton_tip_state.state}")
+            is_pool_member = False
+
+        self.log.info(f"Is {launcher_id} pool member: {is_pool_member}")
+
+        if farmer_rec is not None and (
+            farmer_rec.singleton_tip != singleton_tip or farmer_rec.singleton_tip_state != singleton_tip_state
+        ):
             # This means the singleton has been changed in the blockchain (either by us or someone else). We
             # still keep track of this singleton if the farmer has changed to a different pool, in case they
             # switch back.

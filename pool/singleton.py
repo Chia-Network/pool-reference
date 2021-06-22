@@ -29,14 +29,13 @@ async def get_coin_spend(node_rpc_client: FullNodeRpcClient, coin_record: CoinRe
     return await node_rpc_client.get_puzzle_and_solution(coin_record.coin.name(), coin_record.spent_block_index)
 
 
-async def get_and_validate_singleton_state_inner(
+async def get_singleton_state(
     node_rpc_client: FullNodeRpcClient,
     launcher_id: bytes32,
     farmer_record: Optional[FarmerRecord],
     peak_height: uint32,
     confirmation_security_threshold: int,
-    desired_state: Optional[PoolState],
-) -> Optional[Tuple[CoinSolution, PoolState, bool, bool]]:
+) -> Optional[Tuple[CoinSolution, PoolState]]:
     try:
         if farmer_record is None:
             launcher_coin: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(launcher_id)
@@ -50,11 +49,10 @@ async def get_and_validate_singleton_state_inner(
             last_solution: Optional[CoinSolution] = await get_coin_spend(node_rpc_client, launcher_coin)
             saved_state = solution_to_extra_data(last_solution)
             assert last_solution is not None and saved_state is not None
-            updated = True
         else:
             last_solution = farmer_record.singleton_tip
             saved_state = farmer_record.singleton_tip_state
-            updated = False
+
         saved_solution = last_solution
         last_not_none_state: PoolState = saved_state
         assert last_solution is not None
@@ -87,26 +85,8 @@ async def get_and_validate_singleton_state_inner(
                 # There is a state transition, and it is sufficiently buried
                 saved_solution = last_solution
                 saved_state = last_not_none_state
-                updated = True
 
-        # Validate state of the singleton
-        is_pool_member = True
-        if desired_state is not None:
-            if last_not_none_state.target_puzzle_hash != desired_state.target_puzzle_hash:
-                log.info(f"Wrong target puzzle hash: {last_not_none_state.target_puzzle_hash}")
-                is_pool_member = False
-            elif last_not_none_state.relative_lock_height != desired_state.relative_lock_height:
-                log.info(f"Wrong relative lock height: {last_not_none_state.relative_lock_height}")
-                is_pool_member = False
-            elif last_not_none_state.version != desired_state.version:
-                log.info(f"Wrong version {last_not_none_state.version}")
-                is_pool_member = False
-            elif last_not_none_state.state != desired_state.state:
-                log.info(f"Invalid singleton state {last_not_none_state.state}")
-                is_pool_member = False
-
-        log.info(f"Is pool member? {is_pool_member}")
-        return saved_solution, saved_state, updated, is_pool_member
+        return saved_solution, saved_state
     except Exception as e:
         log.error(f"Error getting singleton: {e}")
         return None
@@ -119,8 +99,8 @@ async def create_absorb_transaction(
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
 ) -> SpendBundle:
-    last_solution, last_state, _, _ = await get_and_validate_singleton_state_inner(
-        node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0, None
+    last_solution, last_state = await get_singleton_state(
+        node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0
     )
     launcher_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(
         farmer_record.launcher_id

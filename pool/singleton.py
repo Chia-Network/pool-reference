@@ -98,10 +98,14 @@ async def create_absorb_transaction(
     peak_height: uint32,
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
-) -> SpendBundle:
-    last_solution, last_state = await get_singleton_state(
+) -> Optional[SpendBundle]:
+    singleton_state_tuple: Optional[Tuple[CoinSolution, PoolState]] = await get_singleton_state(
         node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0
     )
+    if singleton_state_tuple is None:
+        log.info(f"Invalid singleton {farmer_record.launcher_id}.")
+        return None
+    last_solution, last_state = singleton_state_tuple
     launcher_coin_record: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(
         farmer_record.launcher_id
     )

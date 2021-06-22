@@ -316,6 +316,9 @@ class Pool:
                             self.constants.GENESIS_CHALLENGE,
                         )
 
+                        if spend_bundle is None:
+                            continue
+
                         push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
                         if push_tx_response["status"] == "SUCCESS":
                             # TODO(pool): save transaction in records
@@ -511,12 +514,16 @@ class Pool:
 
             # Now we need to check to see that the singleton in the blockchain is still assigned to this pool
             singleton_state_tuple: Optional[
-                Tuple[CoinSolution, PoolState]
+                Tuple[CoinSolution, PoolState, bool]
             ] = await self.get_and_validate_singleton_state(partial.payload.launcher_id)
 
             if singleton_state_tuple is None:
-                self.log.info("Singleton state is None.")
-                # This singleton doesn't exist, or isn't assigned to our pool
+                self.log.info(f"Invalid singleton {partial.payload.launcher_id}")
+                return
+
+            _, _, is_member = singleton_state_tuple
+            if not is_member:
+                self.log.info(f"Singleton is not assigned to this pool")
                 return
 
             async with self.store.lock:
@@ -544,13 +551,15 @@ class Pool:
                 )
 
             singleton_state_tuple: Optional[
-                Tuple[CoinSolution, PoolState]
+                Tuple[CoinSolution, PoolState, bool]
             ] = await self.get_and_validate_singleton_state(request.payload.launcher_id)
 
             if singleton_state_tuple is None:
-                return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton, or not a pool member")
+                return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton {request.payload.launcher_id}")
 
-            last_spend, last_state = singleton_state_tuple
+            last_spend, last_state, is_member = singleton_state_tuple
+            if is_member is None:
+                return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Singleton is not assigned to this pool")
 
             if (
                 request.payload.suggested_difficulty is None
@@ -612,13 +621,16 @@ class Pool:
         if farmer_record is None:
             return error_dict(PoolErrorCode.FARMER_NOT_KNOWN, f"Farmer with launcher_id {launcher_id} not known.")
 
-        singleton_state_tuple: Optional[Tuple[CoinSolution, PoolState]] = await self.get_and_validate_singleton_state(
-            launcher_id
-        )
-        last_spend, last_state = singleton_state_tuple
+        singleton_state_tuple: Optional[
+            Tuple[CoinSolution, PoolState, bool]
+        ] = await self.get_and_validate_singleton_state(launcher_id)
 
         if singleton_state_tuple is None:
-            return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton, or not a pool member")
+            return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Invalid singleton {request.payload.launcher_id}")
+
+        last_spend, last_state, is_member = singleton_state_tuple
+        if is_member is None:
+            return error_dict(PoolErrorCode.INVALID_SINGLETON, f"Singleton is not assigned to this pool")
 
         if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
             return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
@@ -662,7 +674,9 @@ class Pool:
 
         return PutFarmerResponse.from_json_dict(response_dict).from_json_dict()
 
-    async def get_and_validate_singleton_state(self, launcher_id: bytes32) -> Optional[Tuple[CoinSolution, PoolState]]:
+    async def get_and_validate_singleton_state(
+        self, launcher_id: bytes32
+    ) -> Optional[Tuple[CoinSolution, PoolState, bool]]:
         """
         :return: the state of the singleton, if it currently exists in the blockchain, and if it is assigned to
         our pool, with the correct parameters. Otherwise, None. Note that this state must be buried (recent state
@@ -720,9 +734,7 @@ class Pool:
             self.log.info(f"Updating singleton state for {launcher_id}")
             await self.store.update_singleton(launcher_id, singleton_tip, singleton_tip_state, is_pool_member)
 
-        if is_pool_member:
-            return singleton_tip, singleton_tip_state
-        return None
+        return singleton_tip, singleton_tip_state, is_pool_member
 
     async def process_partial(
         self,

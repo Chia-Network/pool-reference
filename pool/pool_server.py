@@ -28,7 +28,7 @@ from chia.util.ints import uint8, uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 
-from store import FarmerRecord
+from record import FarmerRecord
 from pool import Pool
 from util import error_response
 

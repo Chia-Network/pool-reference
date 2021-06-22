@@ -28,9 +28,9 @@ from chia.util.ints import uint8, uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 
-from record import FarmerRecord
-from pool import Pool
-from util import error_response
+from .record import FarmerRecord
+from .pool import Pool
+from .util import error_response
 
 
 def allow_cors(response: web.Response) -> web.Response:
@@ -281,8 +281,12 @@ async def stop():
     await runner.cleanup()
 
 
-if __name__ == "__main__":
+def main():
     try:
         asyncio.run(start_pool_server())
     except KeyboardInterrupt:
         asyncio.run(stop())
+
+
+if __name__ == "__main__":
+    main()

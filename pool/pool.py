@@ -43,11 +43,11 @@ from chia.pools.pool_puzzles import (
     launcher_id_to_p2_puzzle_hash,
 )
 
-from difficulty_adjustment import get_new_difficulty
-from singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
-from store import PoolStore
-from record import FarmerRecord
-from util import error_dict
+from .difficulty_adjustment import get_new_difficulty
+from .singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
+from .store import PoolStore
+from .record import FarmerRecord
+from .util import error_dict
 
 
 class Pool:

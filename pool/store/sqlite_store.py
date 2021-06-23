@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 from typing import Optional, Set, List, Tuple, Dict
 
@@ -9,19 +8,21 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_solution import CoinSolution
 from chia.util.ints import uint64
 
+from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
 
 
-class PoolStore:
-    connection: aiosqlite.Connection
-    lock: asyncio.Lock
+class SqlitePoolStore(AbstractPoolStore):
+    """
+    Pool store based on SQLite.
+    """
+    def __init__(self, db_path: Path = Path('pooldb.sqlite')):
+        super().__init__()
+        self.db_path = db_path
+        self.connection: Optional[aiosqlite.Connection] = None
 
-    @classmethod
-    async def create(cls):
-        self = cls()
-        self.db_path = Path("pooldb.sqlite")
+    async def connect(self):
         self.connection = await aiosqlite.connect(self.db_path)
-        self.lock = asyncio.Lock()
         await self.connection.execute("pragma journal_mode=wal")
         await self.connection.execute("pragma synchronous=2")
         await self.connection.execute(
@@ -50,8 +51,6 @@ class PoolStore:
         await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
 
         await self.connection.commit()
-
-        return self
 
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:

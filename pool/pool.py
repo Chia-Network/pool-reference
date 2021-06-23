@@ -71,8 +71,6 @@ class Pool:
         self.public_key: G1Element = private_key.get_g1()
         self.config = config
         self.constants = constants
-        self.node_rpc_client = None
-        self.wallet_rpc_client = None
 
         self.store: Optional[PoolStore] = None
 
@@ -166,7 +164,9 @@ class Pool:
         self.get_peak_loop_task: Optional[asyncio.Task] = None
 
         self.node_rpc_client: Optional[FullNodeRpcClient] = None
+        self.node_rpc_port = pool_config["node_rpc_port"]
         self.wallet_rpc_client: Optional[WalletRpcClient] = None
+        self.wallet_rpc_port = pool_config["wallet_rpc_port"]
 
     async def start(self):
         self.store = await PoolStore.create()
@@ -174,10 +174,10 @@ class Pool:
 
         self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
-            self_hostname, uint16(8555), DEFAULT_ROOT_PATH, self.config
+            self_hostname, uint16(self.node_rpc_port), DEFAULT_ROOT_PATH, self.config
         )
         self.wallet_rpc_client = await WalletRpcClient.create(
-            self.config["self_hostname"], uint16(9256), DEFAULT_ROOT_PATH, self.config
+            self.config["self_hostname"], uint16(self.wallet_rpc_port), DEFAULT_ROOT_PATH, self.config
         )
         self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
         res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)

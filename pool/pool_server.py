@@ -30,6 +30,7 @@ from chia.util.config import load_config
 
 from .record import FarmerRecord
 from .pool import Pool
+from .store.abstract import AbstractPoolStore
 from .util import error_response
 
 
@@ -48,10 +49,10 @@ def check_authentication_token(launcher_id: bytes32, token: uint64, timeout: uin
 
 
 class PoolServer:
-    def __init__(self, config: Dict, constants: ConsensusConstants):
+    def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
 
         self.log = logging.getLogger(__name__)
-        self.pool = Pool(config, constants)
+        self.pool = Pool(config, constants, pool_store)
 
     async def start(self):
         await self.pool.start()
@@ -247,13 +248,13 @@ server: Optional[PoolServer] = None
 runner = None
 
 
-async def start_pool_server():
+async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None):
     global server
     global runner
     config = load_config(DEFAULT_ROOT_PATH, "config.yaml")
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
     constants: ConsensusConstants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
-    server = PoolServer(config, constants)
+    server = PoolServer(config, constants, pool_store)
     await server.start()
 
     # TODO(pool): support TLS

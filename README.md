@@ -9,6 +9,8 @@ Several things are customizable in this pool reference. This includes:
 * Fees to take, and how much to pay in blockchain fees  
 * How farmers' points are counted when paying (PPS, PPLNS, etc)
 * How farmers receive payouts (XCH, BTC, ETH, etc), and how often
+* What store (DB) is used - by default it's an SQLite db. Users can use their own store implementations, based on 
+  `AbstractPoolStore`, by supplying them to `pool_server.start_pool_server`
 
 However, some things cannot be changed. These are described in SPECIFICATION.md, and mostly relate to validation,
 protocol, and the singleton format for smart coins. 

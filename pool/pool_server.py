@@ -5,7 +5,7 @@ import traceback
 from typing import Dict, Callable, Optional
 
 import aiohttp
-from blspy import AugSchemeMPL, PrivateKey, G2Element
+from blspy import AugSchemeMPL, G2Element
 from aiohttp import web
 from chia.protocols.pool_protocol import (
     PoolErrorCode,
@@ -48,10 +48,10 @@ def check_authentication_token(launcher_id: bytes32, token: uint64, timeout: uin
 
 
 class PoolServer:
-    def __init__(self, private_key: PrivateKey, config: Dict, constants: ConsensusConstants):
+    def __init__(self, config: Dict, constants: ConsensusConstants):
 
         self.log = logging.getLogger(__name__)
-        self.pool = Pool(private_key, config, constants)
+        self.pool = Pool(config, constants)
 
     async def start(self):
         await self.pool.start()
@@ -250,11 +250,10 @@ runner = None
 async def start_pool_server():
     global server
     global runner
-    private_key: PrivateKey = AugSchemeMPL.key_gen(std_hash(b"123"))
     config = load_config(DEFAULT_ROOT_PATH, "config.yaml")
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
     constants: ConsensusConstants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
-    server = PoolServer(private_key, config, constants)
+    server = PoolServer(config, constants)
     await server.start()
 
     # TODO(pool): support TLS

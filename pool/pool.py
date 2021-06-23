@@ -9,7 +9,7 @@ from typing import Dict, Optional, Set, List, Tuple
 import os
 import yaml
 
-from blspy import AugSchemeMPL, PrivateKey, G1Element
+from blspy import AugSchemeMPL, G1Element
 from chia.pools.pool_wallet_info import PoolState, PoolSingletonState
 from chia.protocols.pool_protocol import (
     PoolErrorCode,
@@ -50,7 +50,7 @@ from util import error_dict
 
 
 class Pool:
-    def __init__(self, private_key: PrivateKey, config: Dict, constants: ConsensusConstants):
+    def __init__(self, config: Dict, constants: ConsensusConstants):
         self.follow_singleton_tasks: Dict[bytes32, asyncio.Task] = {}
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
@@ -67,8 +67,6 @@ class Pool:
         self.info_description = pool_config["pool_info"]["description"]
         self.welcome_message = pool_config["welcome_message"]
 
-        self.private_key = private_key
-        self.public_key: G1Element = private_key.get_g1()
         self.config = config
         self.constants = constants
 

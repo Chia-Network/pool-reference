@@ -102,7 +102,7 @@ cd pool-reference
 python3 -m venv ./venv
 source ./venv/bin/activate
 pip install ../chia-blockchain/ 
-sudo CHIA_ROOT="/your/home/dir/.chia/testnet7" ./venv/bin/python pool/pool_server.py
+sudo CHIA_ROOT="/your/home/dir/.chia/testnet7" ./venv/bin/python -m pool
 ```
 
 You should see something like this when starting, but no errors:

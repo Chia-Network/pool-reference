@@ -28,9 +28,10 @@ from chia.util.ints import uint8, uint64, uint32
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
 
-from store import FarmerRecord
-from pool import Pool
-from util import error_response
+from .record import FarmerRecord
+from .pool import Pool
+from .store.abstract import AbstractPoolStore
+from .util import error_response
 
 
 def allow_cors(response: web.Response) -> web.Response:
@@ -48,10 +49,10 @@ def check_authentication_token(launcher_id: bytes32, token: uint64, timeout: uin
 
 
 class PoolServer:
-    def __init__(self, config: Dict, constants: ConsensusConstants):
+    def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
 
         self.log = logging.getLogger(__name__)
-        self.pool = Pool(config, constants)
+        self.pool = Pool(config, constants, pool_store)
 
     async def start(self):
         await self.pool.start()
@@ -247,13 +248,13 @@ server: Optional[PoolServer] = None
 runner = None
 
 
-async def start_pool_server():
+async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None):
     global server
     global runner
     config = load_config(DEFAULT_ROOT_PATH, "config.yaml")
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
     constants: ConsensusConstants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
-    server = PoolServer(config, constants)
+    server = PoolServer(config, constants, pool_store)
     await server.start()
 
     # TODO(pool): support TLS
@@ -281,8 +282,12 @@ async def stop():
     await runner.cleanup()
 
 
-if __name__ == "__main__":
+def main():
     try:
         asyncio.run(start_pool_server())
     except KeyboardInterrupt:
         asyncio.run(stop())
+
+
+if __name__ == "__main__":
+    main()

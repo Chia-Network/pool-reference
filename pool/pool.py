@@ -43,14 +43,16 @@ from chia.pools.pool_puzzles import (
     launcher_id_to_p2_puzzle_hash,
 )
 
-from difficulty_adjustment import get_new_difficulty
-from singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
-from store import FarmerRecord, PoolStore
-from util import error_dict
+from .difficulty_adjustment import get_new_difficulty
+from .singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
+from .store.abstract import AbstractPoolStore
+from .store.sqlite_store import SqlitePoolStore
+from .record import FarmerRecord
+from .util import error_dict
 
 
 class Pool:
-    def __init__(self, config: Dict, constants: ConsensusConstants):
+    def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
         self.follow_singleton_tasks: Dict[bytes32, asyncio.Task] = {}
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
@@ -70,7 +72,7 @@ class Pool:
         self.config = config
         self.constants = constants
 
-        self.store: Optional[PoolStore] = None
+        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
 
         self.pool_fee = pool_config["pool_fee"]
 
@@ -167,7 +169,7 @@ class Pool:
         self.wallet_rpc_port = pool_config["wallet_rpc_port"]
 
     async def start(self):
-        self.store = await PoolStore.create()
+        await self.store.connect()
         self.pending_point_partials = asyncio.Queue()
 
         self_hostname = self.config["self_hostname"]

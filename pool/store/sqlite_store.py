@@ -1,5 +1,3 @@
-import asyncio
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Set, List, Tuple, Dict
 
@@ -10,35 +8,21 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_solution import CoinSolution
 from chia.util.ints import uint64
 
-from chia.util.streamable import streamable, Streamable
+from .abstract import AbstractPoolStore
+from ..record import FarmerRecord
 
 
-@dataclass(frozen=True)
-@streamable
-class FarmerRecord(Streamable):
-    launcher_id: bytes32  # This uniquely identifies the singleton on the blockchain (ID for this farmer)
-    p2_singleton_puzzle_hash: bytes32  # Derived from the launcher id, delay_time and delay_puzzle_hash
-    delay_time: uint64  # Backup time after which farmer can claim rewards directly, if pool unresponsive
-    delay_puzzle_hash: bytes32  # Backup puzzlehash to claim rewards
-    authentication_public_key: G1Element  # This is the latest public key of the farmer (signs all partials)
-    singleton_tip: CoinSolution  # Last coin solution that is buried in the blockchain, for this singleton
-    singleton_tip_state: PoolState  # Current state of the singleton
-    points: uint64  # Total points accumulated since last rest (or payout)
-    difficulty: uint64  # Current difficulty for this farmer
-    payout_instructions: str  # This is where the pool will pay out rewards to the farmer
-    is_pool_member: bool  # If the farmer leaves the pool, this gets set to False
+class SqlitePoolStore(AbstractPoolStore):
+    """
+    Pool store based on SQLite.
+    """
+    def __init__(self, db_path: Path = Path('pooldb.sqlite')):
+        super().__init__()
+        self.db_path = db_path
+        self.connection: Optional[aiosqlite.Connection] = None
 
-
-class PoolStore:
-    connection: aiosqlite.Connection
-    lock: asyncio.Lock
-
-    @classmethod
-    async def create(cls):
-        self = cls()
-        self.db_path = Path("pooldb.sqlite")
+    async def connect(self):
         self.connection = await aiosqlite.connect(self.db_path)
-        self.lock = asyncio.Lock()
         await self.connection.execute("pragma journal_mode=wal")
         await self.connection.execute("pragma synchronous=2")
         await self.connection.execute(
@@ -67,8 +51,6 @@ class PoolStore:
         await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
 
         await self.connection.commit()
-
-        return self
 
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:

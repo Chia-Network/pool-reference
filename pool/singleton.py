@@ -18,7 +18,7 @@ from chia.types.coin_solution import CoinSolution
 from chia.types.spend_bundle import SpendBundle
 from chia.util.ints import uint32
 
-from store import FarmerRecord
+from .record import FarmerRecord
 
 log = logging
 log.basicConfig(level=logging.INFO)

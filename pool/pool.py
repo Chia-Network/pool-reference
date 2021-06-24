@@ -78,7 +78,7 @@ class Pool:
         self.iters_limit = self.constants.POOL_SUB_SLOT_ITERS // 64
 
         # This number should not be changed, since users will put this into their singletons
-        self.relative_lock_height = uint32(100)
+        self.relative_lock_height = uint32(10)
 
         # TODO(pool): potentially tweak these numbers for security and performance
         # This is what the user enters into the input field. This exact value will be stored on the blockchain

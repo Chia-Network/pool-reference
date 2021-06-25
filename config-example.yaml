@@ -24,3 +24,9 @@ payment_interval: 600
 max_additions_per_transaction: 400
 number_of_partials_target: 50
 time_target: 8640
+logging:
+  log_path: /var/log/chia
+  log_filename: pool-server.log
+  log_level: INFO
+  log_maxfilesrotation: 7
+  log_stdout: false

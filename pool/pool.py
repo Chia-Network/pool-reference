@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import pathlib
 import time
 import traceback
 from asyncio import Task
@@ -36,6 +37,7 @@ from chia.types.end_of_slot_bundle import EndOfSubSlotBundle
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.consensus.pot_iterations import calculate_iterations_quality
 from chia.util.lru_cache import LRUCache
+from chia.util.chia_logging import initialize_logging
 from chia.wallet.transaction_record import TransactionRecord
 from chia.pools.pool_puzzles import (
     get_most_recent_singleton_coin_from_coin_solution,
@@ -61,6 +63,8 @@ class Pool:
         # We load our configurations from here
         with open(os.getcwd() + "/config.yaml") as f:
             pool_config: Dict = yaml.safe_load(f)
+
+        initialize_logging("pool", pool_config["logging"], pathlib.Path(pool_config["logging"]["log_path"]))
 
         # Set our pool info here
         self.info_default_res = pool_config["pool_info"]["default_res"]

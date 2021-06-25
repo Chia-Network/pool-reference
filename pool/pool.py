@@ -726,7 +726,7 @@ class Pool:
             coin_record: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(singleton_tip.coin)
             assert coin_record is not None
             if self.blockchain_state["peak"].height - coin_record.confirmed_block_index > self.relative_lock_height:
-                self.log.info("Removing launcher_id {launcher_id} because they have left the pool")
+                self.log.info(f"launcher_id {launcher_id} got enough confirmations to leave the pool")
                 is_pool_member = False
 
         self.log.info(f"Is {launcher_id} pool member: {is_pool_member}")

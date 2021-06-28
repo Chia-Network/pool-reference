@@ -22,8 +22,9 @@ collect_pool_rewards_interval: 600
 confirmation_security_threshold: 6
 payment_interval: 600
 max_additions_per_transaction: 400
-number_of_partials_target: 50
-time_target: 8640
+number_of_partials_target: 300
+time_target: 86400
+relative_lock_height: 32
 logging:
   log_path: /var/log/chia
   log_filename: pool-server.log

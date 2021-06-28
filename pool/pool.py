@@ -84,7 +84,7 @@ class Pool:
         self.iters_limit = self.constants.POOL_SUB_SLOT_ITERS // 64
 
         # This number should not be changed, since users will put this into their singletons
-        self.relative_lock_height = uint32(100)
+        self.relative_lock_height = uint32(pool_config["relative_lock_height"])
 
         # TODO(pool): potentially tweak these numbers for security and performance
         # This is what the user enters into the input field. This exact value will be stored on the blockchain
@@ -715,10 +715,14 @@ class Pool:
         # Validate state of the singleton
         is_pool_member = True
         if singleton_tip_state.target_puzzle_hash != self.default_target_puzzle_hash:
-            self.log.info(f"Wrong target puzzle hash: {singleton_tip_state.target_puzzle_hash} for launcher_id {launcher_id}")
+            self.log.info(
+                f"Wrong target puzzle hash: {singleton_tip_state.target_puzzle_hash} for launcher_id {launcher_id}"
+            )
             is_pool_member = False
         elif singleton_tip_state.relative_lock_height != self.relative_lock_height:
-            self.log.info(f"Wrong relative lock height: {singleton_tip_state.relative_lock_height} for launcher_id {launcher_id}")
+            self.log.info(
+                f"Wrong relative lock height: {singleton_tip_state.relative_lock_height} for launcher_id {launcher_id}"
+            )
             is_pool_member = False
         elif singleton_tip_state.version != POOL_PROTOCOL_VERSION:
             self.log.info(f"Wrong version {singleton_tip_state.version} for launcher_id {launcher_id}")

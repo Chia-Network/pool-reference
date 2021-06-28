@@ -804,7 +804,7 @@ class Pool:
         if signage_point is not None:
             challenge_hash: bytes32 = signage_point.cc_vdf.challenge
         else:
-            challenge_hash = end_of_sub_slot.challenge_chain.challenge_chain_end_of_slot_vdf.get_hash()
+            challenge_hash = end_of_sub_slot.challenge_chain.get_hash()
 
         quality_string: Optional[bytes32] = partial.payload.proof_of_space.verify_and_get_quality_string(
             self.constants, challenge_hash, partial.payload.sp_hash

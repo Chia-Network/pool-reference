@@ -306,11 +306,30 @@ class Pool:
                         if singleton_coin_record is None:
                             continue
                         if singleton_coin_record.spent:
-                            self.log.warning(
-                                f"Singleton coin {singleton_coin_record.coin.name()} is spent, will not "
-                                f"claim rewards"
+                            singleton_state_tuple: Optional[
+                                Tuple[CoinSolution, PoolState, bool]
+                            ] = await self.get_and_validate_singleton_state(rec.launcher_id)
+                            if singleton_state_tuple is None:
+                                self.log.info(f"Absorb: invalid singleton {rec.launcher_id}")
+                                return
+                            new_singleton_tip_solution, _, is_member = singleton_state_tuple
+                            if not is_member:
+                                self.log.info(f"Absorb: singleton is not assigned to this pool {rec.launcher_id}")
+                                return
+
+                            singleton_tip = get_most_recent_singleton_coin_from_coin_solution(rec.singleton_tip)
+                            if singleton_tip is None:
+                                continue
+                            singleton_coin_record = await self.node_rpc_client.get_coin_record_by_name(
+                                singleton_tip.name()
                             )
-                            continue
+
+                            if singleton_coin_record is None or singleton_coin_record.spent:
+                                self.log.warning(
+                                    f"Singleton coin {singleton_coin_record.coin.name()} is spent, will not "
+                                    f"claim rewards"
+                                )
+                                continue
 
                         spend_bundle = await create_absorb_transaction(
                             self.node_rpc_client,

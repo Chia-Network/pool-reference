@@ -75,9 +75,10 @@ latest seen authentication key for that launcher_id.
 
 ### Install and run (Testnet)
 To run a pool, you must use this along with a branch of `chia-blockchain`.
+NOTE: Any plot created previously on `testnet7` is invalid under the new `testnet9`
 
-1. Checkout the `pools.dev` branch of `chia-blockchain`, and install it. Checkout this repo in another
-directory next to (not inside) `chia-blockchain`. Make sure to be on testnet by doing `export CHIA_ROOT=".chia/testnet7"` and `chia configure --testnet true`.
+1. Checkout the `pools.testnet9` branch of `chia-blockchain`, and install it. Checkout this repo in another directory next to (not inside) `chia-blockchain`.  
+This branch (`pools.testnet9`) comes pre configured to testnet9, no need for setting `CHIA_ROOT` or running `chia configure -t true`.
 
 2. Create three keys, one which will be used for the block rewards from the blockchain, one to receive the pool fee that is kept by the pool, and the third to be a wallet that acts as a test user.
 
@@ -102,7 +103,7 @@ cd pool-reference
 python3 -m venv ./venv
 source ./venv/bin/activate
 pip install ../chia-blockchain/ 
-sudo CHIA_ROOT="/your/home/dir/.chia/testnet7" ./venv/bin/python -m pool
+sudo CHIA_ROOT="/your/home/dir/.chia/testnet9" ./venv/bin/python -m pool
 ```
 
 You should see something like this when starting, but no errors:
@@ -111,7 +112,7 @@ INFO:root:Logging in: {'fingerprint': 2164248527, 'success': True}
 INFO:root:Obtaining balance: {'confirmed_wallet_balance': 0, 'max_send_amount': 0, 'pending_change': 0, 'pending_coin_removal_count': 0, 'spendable_balance': 0, 'unconfirmed_wallet_balance': 0, 'unspent_coin_count': 0, 'wallet_id': 1}
 ```
 
-8. Create a pool nft (on the farmer key) by doing `chia plotnft create -u http://127.0.0.1:80`, or whatever host:port you want
+8. Create a pool nft (on the farmer key) by doing `chia plotnft create -s pool -u http://127.0.0.1:80`, or whatever host:port you want
 to use for your pool. Approve it and wait for transaction confirmation. This url must match *exactly* with what the 
    pool uses.
    

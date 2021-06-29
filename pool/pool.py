@@ -767,12 +767,11 @@ class Pool:
                 f"The aggregate signature is invalid {partial.aggregate_signature}",
             )
 
-        # TODO (chia-dev): Check DB p2_singleton_puzzle_hash and compare
-        # if partial.payload.proof_of_space.pool_contract_puzzle_hash != p2_singleton_puzzle_hash:
-        #     return error_dict(
-        #       PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH,
-        #       f"Invalid plot pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}"
-        #     )
+        if partial.payload.proof_of_space.pool_contract_puzzle_hash != farmer_record.p2_singleton_puzzle_hash:
+            return error_dict(
+                PoolErrorCode.INVALID_P2_SINGLETON_PUZZLE_HASH,
+                f"Invalid pool contract puzzle hash {partial.payload.proof_of_space.pool_contract_puzzle_hash}",
+            )
 
         async def get_signage_point_or_eos():
             if partial.payload.end_of_sub_slot:

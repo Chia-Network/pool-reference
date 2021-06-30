@@ -108,7 +108,6 @@ will use 443 if there is no port. Note that the trailing slash must NOT be prese
 https://subdomain.domain.tld:port/path
 ```
 
-
 ## GET /pool_info
 
 This takes no arguments, and allows clients to fetch information about a pool. It is called right before joining a pool,

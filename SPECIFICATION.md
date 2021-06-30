@@ -102,11 +102,12 @@ The serialized payload must follow the `Streamable` standard defined
 [here](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/util/streamable.py).
 
 ## Pool URL
-The pool URL is the url that farmers use to connect to the pool. It must be in this exact format:
+The pool URL is the url that farmers use to connect to the pool. The subdomains, port, and path are optional. The client
+will use 443 if there is no port. Note that the trailing slash must NOT be present.
 ```
-https://domain.tld
+https://subdomain.domain.tld/path
 OR 
-https://domain.tld:port
+https://subdomain.tld:port/path
 ```
 
 

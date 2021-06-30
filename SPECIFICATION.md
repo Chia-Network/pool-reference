@@ -459,11 +459,6 @@ where the parameter must be serialized and hashed according to [Signature valida
 signature must be signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS
 IETF spec.
 
-## 1/8 vs 7/8
-Note that the coinbase rewards in Chia are divided into two coins: the farmer coin and the pool coin. The farmer coin
-(1/8) only goes to the puzzle hash signed by the farmer private key, while the pool coin (7/8) goes to the pool.
-The user transaction fees on the blockchain are included in the farmer coin as well. This split of 7/8 1/8 exists
-to prevent attacks where one pool tries to destroy another by farming partials, but never submitting winning blocks.
 
 ## Difficulty
 The difficulty allows the pool operator to control how many partials per day they are receiving from each farmer.

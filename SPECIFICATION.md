@@ -103,11 +103,9 @@ The serialized payload must follow the `Streamable` standard defined
 
 ## Pool URL
 The pool URL is the url that farmers use to connect to the pool. The subdomains, port, and path are optional. The client
-will use 443 if there is no port. Note that the trailing slash must NOT be present.
+will use 443 if there is no port. Note that the trailing slash must NOT be present. Everything must be lower case.
 ```
-https://subdomain.domain.tld/path
-OR 
-https://subdomain.tld:port/path
+https://subdomain.domain.tld:port/path
 ```
 
 

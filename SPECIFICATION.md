@@ -101,6 +101,15 @@ message_hash = sha256(serialized_payload)
 The serialized payload must follow the `Streamable` standard defined
 [here](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/util/streamable.py).
 
+## Pool URL
+The pool URL is the url that farmers use to connect to the pool. It must be in this exact format:
+```
+https://domain.tld
+OR 
+https://domain.tld:port
+```
+
+
 ## GET /pool_info
 
 This takes no arguments, and allows clients to fetch information about a pool. It is called right before joining a pool,

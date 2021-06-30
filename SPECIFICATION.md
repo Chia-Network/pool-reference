@@ -5,6 +5,19 @@ It relies on farmers having smart coins (referred to as Pool NFTs in GUI + CLI) 
 by making transactions on the blockchain. Furthermore, it decreases the reliance on pools for block production, since
 the protocol only handles distribution of rewards, and it protects against pools or farmers acting maliciously.
 
+
+## Security considerations
+The pool must ensure that partials arrive quickly, faster than the 28 second time limit of inclusion into the
+blockchain. This allows farmers that have slow setups to detect issues.
+
+The Pool server must check that the `pool_contract_puzzle_hash` a.k.a. `p2_singleton_puzzle_hash` matches the
+puzzle that they expect. Otherwise, the pool has no guarantee that users will not attempt to claim block rewards
+for themselves, and immediately leave the pool, something that the provided smart contract prevents.
+
+The Chia client must only connect to the pool configuration URL via HTTPS over TLS >= 1.3. This is to
+prevent session hijacking, leading to user funds being stolen.
+
+
 ## Parties
 
 The parties involved in the pool protocol are the pool operator and farmers. Each farmer is running
@@ -463,6 +476,3 @@ For example, 100 TiB of space should yield approximately 10,000 points per day, 
 The specification does not require pools to pay out proportionally by points, but the payout scheme should be clear to
 farmers, and points should be acknowledged and accumulated points returned in the response.
 
-## Security considerations
-The pool must ensure that partials arrive quickly, faster than the 28 second time limit of inclusion into the
-blockchain. This allows farmers that have slow setups to detect issues.

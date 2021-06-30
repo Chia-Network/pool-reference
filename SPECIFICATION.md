@@ -14,7 +14,8 @@ The Pool server must check that the `pool_contract_puzzle_hash` a.k.a. `p2_singl
 puzzle that they expect. Otherwise, the pool has no guarantee that users will not attempt to claim block rewards
 for themselves, and immediately leave the pool, something that the provided smart contract prevents.
 
-The Chia client must only connect to the pool configuration URL via HTTPS over TLS >= 1.3
+The Chia client must only connect to the pool configuration URL via HTTPS over TLS >= 1.3. This is to
+prevent session hijacking, leading to user funds being stolen.
 
 
 ## Parties

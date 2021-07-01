@@ -5,7 +5,7 @@ import time
 import traceback
 from asyncio import Task
 from math import floor
-from typing import Dict, Optional, Set, List, Tuple
+from typing import Dict, Optional, Set, List, Tuple, Callable
 
 import os
 import yaml
@@ -54,7 +54,8 @@ from .util import error_dict
 
 
 class Pool:
-    def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
+    def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None,
+                 difficulty_function: Callable = get_new_difficulty):
         self.follow_singleton_tasks: Dict[bytes32, asyncio.Task] = {}
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
@@ -91,6 +92,7 @@ class Pool:
         self.pool_url = pool_config["pool_url"]
         self.min_difficulty = uint64(pool_config["min_difficulty"])  # 10 difficulty is about 1 proof a day per plot
         self.default_difficulty: uint64 = uint64(pool_config["default_difficulty"])
+        self.difficulty_function: Callable = difficulty_function
 
         self.pending_point_partials: Optional[asyncio.Queue] = None
         self.recent_points_added: LRUCache = LRUCache(20000)
@@ -842,7 +844,7 @@ class Pool:
                     partial.payload.launcher_id, self.number_of_partials_target
                 )
                 # Only update the difficulty if we meet certain conditions
-                new_difficulty: uint64 = get_new_difficulty(
+                new_difficulty: uint64 = self.difficulty_function(
                     recent_partials,
                     int(self.number_of_partials_target),
                     int(self.time_target),

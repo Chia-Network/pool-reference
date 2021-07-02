@@ -698,6 +698,7 @@ class Pool:
                     farmer_rec,
                     self.blockchain_state["peak"].height,
                     self.confirmation_security_threshold,
+                    self.constants.GENESIS_CHALLENGE,
                 )
             )
             self.follow_singleton_tasks[launcher_id] = singleton_task

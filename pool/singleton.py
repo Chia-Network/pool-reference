@@ -36,7 +36,7 @@ async def get_singleton_state(
     farmer_record: Optional[FarmerRecord],
     peak_height: uint32,
     confirmation_security_threshold: int,
-) -> Optional[Tuple[CoinSolution, PoolState]]:
+) -> Optional[Tuple[CoinSolution, PoolState, PoolState]]:
     try:
         if farmer_record is None:
             launcher_coin: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(launcher_id)
@@ -82,12 +82,12 @@ async def get_singleton_state(
 
             if pool_state is not None:
                 last_not_none_state = pool_state
-            if peak_height - confirmation_security_threshold > next_coin_record.spent_block_index:
+            if peak_height - confirmation_security_threshold >= next_coin_record.spent_block_index:
                 # There is a state transition, and it is sufficiently buried
                 saved_solution = last_solution
                 saved_state = last_not_none_state
 
-        return saved_solution, saved_state
+        return saved_solution, saved_state, last_not_none_state
     except Exception as e:
         log.error(f"Error getting singleton: {e}")
         return None
@@ -100,13 +100,15 @@ async def create_absorb_transaction(
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
 ) -> Optional[SpendBundle]:
-    singleton_state_tuple: Optional[Tuple[CoinSolution, PoolState]] = await get_singleton_state(
+    singleton_state_tuple: Optional[Tuple[CoinSolution, PoolState, PoolState]] = await get_singleton_state(
         node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0
     )
     if singleton_state_tuple is None:
         log.info(f"Invalid singleton {farmer_record.launcher_id}.")
         return None
-    last_solution, last_state = singleton_state_tuple
+    last_solution, last_state, last_state_2 = singleton_state_tuple
+    # Here the buried state is equivalent to the latest state, because we use 0 as the security_threshold
+    assert last_state == last_state_2
 
     if last_state.state == PoolSingletonState.SELF_POOLING:
         log.info(f"Don't try to absorb from former farmer {farmer_record.launcher_id}.")

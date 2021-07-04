@@ -389,7 +389,8 @@ class Pool:
                             {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount}
                         ]
                         for points, ph in points_and_ph:
-                            additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point})
+                            if points > 0:
+                                additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point})
 
                             if len(additions_sub_list) == self.max_additions_per_transaction:
                                 await self.pending_payments.put(additions_sub_list.copy())

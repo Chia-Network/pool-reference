@@ -111,7 +111,7 @@ Note that the coinbase rewards in Chia are divided into two coins: the farmer co
 The user transaction fees on the blockchain are included in the farmer coin as well. This split of 7/8 1/8 exists
 to prevent attacks where one pool tries to destroy another by farming partials, but never submitting winning blocks.
 
-##% Difficulty
+### Difficulty
 The difficulty allows the pool operator to control how many partials per day they are receiving from each farmer.
 The difficulty can be adjusted separately for each farmer. A reasonable target would be 300 partials per day,
 to ensure frequent feedback to the farmer, and low variability.

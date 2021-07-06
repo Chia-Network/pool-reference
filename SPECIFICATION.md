@@ -202,7 +202,7 @@ where the parameter must be serialized and hashed according to [Signature valida
 signature must be signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS
 IETF spec.
 
-Note: the pool MUST return the current points balance, which is the total number of points found since the last 
+Note: The pool MUST return the current points balance, which is the total number of points found since the last 
 payout for that user. 
 
 ## POST /farmer
@@ -478,4 +478,3 @@ For example, 100 TiB of space should yield approximately 10,000 points per day, 
 100 or 200. It should not matter what difficulty is set for a farmer, as long as they are consistently submitting partials.
 The specification does not require pools to pay out proportionally by points, but the payout scheme should be clear to
 farmers, and points should be acknowledged and accumulated points returned in the response.
-

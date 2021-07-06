@@ -735,7 +735,7 @@ class Pool:
             is_pool_member = False
         elif singleton_tip_state.state == PoolSingletonState.LEAVING_POOL.value:
             coin_record: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
-                buried_singleton_tip.coin
+                buried_singleton_tip.coin.name()
             )
             assert coin_record is not None
             if self.blockchain_state["peak"].height - coin_record.confirmed_block_index > self.relative_lock_height:

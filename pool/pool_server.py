@@ -31,7 +31,7 @@ from chia.util.config import load_config
 from .record import FarmerRecord
 from .pool import Pool
 from .store.abstract import AbstractPoolStore
-from .util import error_response
+from .util import error_response, RequestMetadata
 
 
 def allow_cors(response: web.Response) -> web.Response:
@@ -134,6 +134,16 @@ class PoolServer:
         self.pool.log.info(f"get_farmer response {response.to_json_dict()}, " f"launcher_id: {launcher_id.hex()}")
         return obj_to_response(response)
 
+    def post_metadata_from_request(self, request_obj):
+        return RequestMetadata(
+            url=request_obj.url,
+            scheme=request_obj.scheme,
+            headers=request_obj.headers,
+            cookies=dict(request_obj.cookies),
+            query=dict(request_obj.query),
+            remote=request_obj.remote,
+        )
+
     async def post_farmer(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
         post_farmer_request: PostFarmerRequest = PostFarmerRequest.from_json_dict(await request_obj.json())
@@ -146,7 +156,8 @@ class PoolServer:
         if authentication_token_error is not None:
             return authentication_token_error
 
-        post_farmer_response = await self.pool.add_farmer(post_farmer_request)
+        post_farmer_response = await self.pool.add_farmer(
+            post_farmer_request, self.post_metadata_from_request(request_obj))
 
         self.pool.log.info(
             f"post_farmer response {post_farmer_response}, "

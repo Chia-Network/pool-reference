@@ -177,6 +177,12 @@ async def create_absorb_transaction(
         last_solution = absorb_spend[0]
         all_spends += absorb_spend
         # TODO(pool): handle the case where the cost exceeds the size of the block
+        # TODO(pool): If you want to add a fee, you should do the following:
+        #  - only absorb one reward at a time
+        #  - spend the coin that you are receiving in the same spend bundle that it is created
+        #  - create an output with slightly less XCH, to yourself. for example, 1.7499 XCH
+        #  - The remaining value will automatically be used as a fee
+
     if len(all_spends) == 0:
         return None
     return SpendBundle(all_spends, G2Element())

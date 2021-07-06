@@ -14,7 +14,7 @@ The Pool server must check that the `pool_contract_puzzle_hash` a.k.a. `p2_singl
 puzzle that they expect. Otherwise, the pool has no guarantee that users will not attempt to claim block rewards
 for themselves, and immediately leave the pool, something that the provided smart contract prevents.
 
-The Chia client must only connect to the pool configuration URL via HTTPS over TLS >= 1.3. This is to
+The Chia client must only connect to the pool configuration URL via HTTPS over TLS >= 1.2. This is to
 prevent session hijacking, leading to user funds being stolen.
 
 
@@ -208,6 +208,9 @@ according to [Signature validation](#signature-validation) and the signature mus
 where the parameter must be serialized and hashed according to [Signature validation](#signature-validation) and the
 signature must be signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS
 IETF spec.
+
+Note: The pool MUST return the current points balance, which is the total number of points found since the last 
+payout for that user. 
 
 ## POST /farmer
 Register a farmer with the pool. This is required once before submitting the first partial.
@@ -477,4 +480,3 @@ For example, 100 TiB of space should yield approximately 10,000 points per day, 
 100 or 200. It should not matter what difficulty is set for a farmer, as long as they are consistently submitting partials.
 The specification does not require pools to pay out proportionally by points, but the payout scheme should be clear to
 farmers, and points should be acknowledged and accumulated points returned in the response.
-

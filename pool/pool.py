@@ -700,19 +700,20 @@ class Pool:
                     farmer_rec,
                     self.blockchain_state["peak"].height,
                     self.confirmation_security_threshold,
+                    self.constants.GENESIS_CHALLENGE,
                 )
             )
             self.follow_singleton_tasks[launcher_id] = singleton_task
             remove_after = True
 
-        optional_result: Optional[Tuple[CoinSolution, PoolState]] = await singleton_task
+        optional_result: Optional[Tuple[CoinSolution, PoolState, PoolState]] = await singleton_task
         if remove_after and launcher_id in self.follow_singleton_tasks:
             await self.follow_singleton_tasks.pop(launcher_id)
 
         if optional_result is None:
             return None
 
-        singleton_tip, singleton_tip_state = optional_result
+        buried_singleton_tip, buried_singleton_tip_state, singleton_tip_state = optional_result
 
         # Validate state of the singleton
         is_pool_member = True
@@ -733,7 +734,9 @@ class Pool:
             self.log.info(f"Invalid singleton state {singleton_tip_state.state} for launcher_id {launcher_id}")
             is_pool_member = False
         elif singleton_tip_state.state == PoolSingletonState.LEAVING_POOL.value:
-            coin_record: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(singleton_tip.coin)
+            coin_record: Optional[CoinRecord] = await self.node_rpc_client.get_coin_record_by_name(
+                buried_singleton_tip.coin
+            )
             assert coin_record is not None
             if self.blockchain_state["peak"].height - coin_record.confirmed_block_index > self.relative_lock_height:
                 self.log.info(f"launcher_id {launcher_id} got enough confirmations to leave the pool")
@@ -742,15 +745,18 @@ class Pool:
         self.log.info(f"Is {launcher_id} pool member: {is_pool_member}")
 
         if farmer_rec is not None and (
-            farmer_rec.singleton_tip != singleton_tip or farmer_rec.singleton_tip_state != singleton_tip_state
+            farmer_rec.singleton_tip != buried_singleton_tip
+            or farmer_rec.singleton_tip_state != buried_singleton_tip_state
         ):
             # This means the singleton has been changed in the blockchain (either by us or someone else). We
             # still keep track of this singleton if the farmer has changed to a different pool, in case they
             # switch back.
             self.log.info(f"Updating singleton state for {launcher_id}")
-            await self.store.update_singleton(launcher_id, singleton_tip, singleton_tip_state, is_pool_member)
+            await self.store.update_singleton(
+                launcher_id, buried_singleton_tip, buried_singleton_tip_state, is_pool_member
+            )
 
-        return singleton_tip, singleton_tip_state, is_pool_member
+        return buried_singleton_tip, buried_singleton_tip_state, is_pool_member
 
     async def process_partial(
         self,

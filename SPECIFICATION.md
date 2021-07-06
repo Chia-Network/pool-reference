@@ -101,6 +101,13 @@ message_hash = sha256(serialized_payload)
 The serialized payload must follow the `Streamable` standard defined
 [here](https://github.com/Chia-Network/chia-blockchain/blob/main/chia/util/streamable.py).
 
+## Pool URL
+The pool URL is the url that farmers use to connect to the pool. The subdomains, port, and path are optional. The client
+will use 443 if there is no port. Note that the trailing slash must NOT be present. Everything must be lower case.
+```
+https://subdomain.domain.tld:port/path
+```
+
 ## GET /pool_info
 
 This takes no arguments, and allows clients to fetch information about a pool. It is called right before joining a pool,
@@ -455,11 +462,6 @@ where the parameter must be serialized and hashed according to [Signature valida
 signature must be signed by the private key of the `authentication_public_key` using the Augmented Scheme in the BLS
 IETF spec.
 
-## 1/8 vs 7/8
-Note that the coinbase rewards in Chia are divided into two coins: the farmer coin and the pool coin. The farmer coin
-(1/8) only goes to the puzzle hash signed by the farmer private key, while the pool coin (7/8) goes to the pool.
-The user transaction fees on the blockchain are included in the farmer coin as well. This split of 7/8 1/8 exists
-to prevent attacks where one pool tries to destroy another by farming partials, but never submitting winning blocks.
 
 ## Difficulty
 The difficulty allows the pool operator to control how many partials per day they are receiving from each farmer.

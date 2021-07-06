@@ -36,7 +36,7 @@ requiring a central server
 When not pooling, farmers receive signage points from full nodes every 9 seconds, and send these signage points to the
 harvester. Each signage point is sent along with the `sub_slot_iters` and `difficulty`, two network-wide parameters
 which are adjusted every day (4608 blocks). The `sub_slot_iters` is the number of VDF iterations performed in 10
-minutes for the fastest VDF in the network. This increases if the fastest timelord's speed increases. The dififculty
+minutes for the fastest VDF in the network. This increases if the fastest timelord's speed increases. The difficulty
 is similiarly affected by timelord speed (it goes up when timelord speed increases, since blocks come faster), but 
 it's also affected by the total amount of space in the network. These two parameters determine how difficult it is
 to "win" a block and find a proof.

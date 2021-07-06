@@ -52,6 +52,9 @@ class SqlitePoolStore(AbstractPoolStore):
 
         await self.connection.commit()
 
+    async def close(self):
+        await self.connection.close()
+
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:
         return FarmerRecord(

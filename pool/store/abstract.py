@@ -22,6 +22,10 @@ class AbstractPoolStore(ABC):
         """Perform IO-related initialization"""
 
     @abstractmethod
+    async def close(self):
+        """Close any IO used by the store"""
+
+    @abstractmethod
     async def add_farmer_record(self, farmer_record: FarmerRecord):
         """Persist a new Farmer in the store"""
 

@@ -219,7 +219,7 @@ class Pool:
         await self.wallet_rpc_client.await_closed()
         self.node_rpc_client.close()
         await self.node_rpc_client.await_closed()
-        await self.store.connection.close()
+        await self.store.close()
 
     async def collect_pool_rewards_loop(self):
         """

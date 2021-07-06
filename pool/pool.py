@@ -178,20 +178,10 @@ class Pool:
         await self.store.connect()
         self.pending_point_partials = asyncio.Queue()
 
-        self_hostname = self.config["self_hostname"]
-        self.node_rpc_client = await FullNodeRpcClient.create(
-            self_hostname, uint16(self.node_rpc_port), DEFAULT_ROOT_PATH, self.config
-        )
-        self.wallet_rpc_client = await WalletRpcClient.create(
-            self.config["self_hostname"], uint16(self.wallet_rpc_port), DEFAULT_ROOT_PATH, self.config
-        )
+        await self.init_node_rpc()
+        await self.init_wallet_rpc()
+
         self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
-        res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
-        if not res["success"]:
-            raise ValueError(f"Error logging in: {res['error']}. Make sure your config fingerprint is correct.")
-        self.log.info(f"Logging in: {res}")
-        res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
-        self.log.info(f"Obtaining balance: {res}")
 
         self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
 
@@ -202,6 +192,22 @@ class Pool:
         self.get_peak_loop_task = asyncio.create_task(self.get_peak_loop())
 
         self.pending_payments = asyncio.Queue()
+
+    async def init_node_rpc(self):
+        self.node_rpc_client = await FullNodeRpcClient.create(
+            self.config["self_hostname"], uint16(self.node_rpc_port), DEFAULT_ROOT_PATH, self.config
+        )
+
+    async def init_wallet_rpc(self):
+        self.wallet_rpc_client = await WalletRpcClient.create(
+            self.config["self_hostname"], uint16(self.wallet_rpc_port), DEFAULT_ROOT_PATH, self.config
+        )
+        res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
+        if not res["success"]:
+            raise ValueError(f"Error logging in: {res['error']}. Make sure your config fingerprint is correct.")
+        self.log.info(f"Logging in: {res}")
+        res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
+        self.log.info(f"Obtaining balance: {res}")
 
     async def stop(self):
         if self.confirm_partials_loop_task is not None:

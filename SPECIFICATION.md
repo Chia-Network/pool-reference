@@ -423,12 +423,13 @@ Request parameters:
 ```
 - launcher_id
 - authentication_token
+- target_puzzle_hash
 - signature
 ```
 
 Example request:
 ```
-https://poolurl.com/login?launcher_id=:launcher_id&authentication_token=:token&signature=:signature
+https://poolurl.com/login?launcher_id=:launcher_id&authentication_token=:token&target_puzzle_hash=:target_puzzle_hash&signature=:signature
 ```
 
 #### launcher_id

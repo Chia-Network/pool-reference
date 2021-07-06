@@ -45,6 +45,7 @@ from chia.pools.pool_puzzles import (
     launcher_id_to_p2_puzzle_hash,
 )
 
+from .blockchain_state import StateKeeper
 from .difficulty_adjustment import get_new_difficulty
 from .singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
 from .store.abstract import AbstractPoolStore
@@ -152,12 +153,6 @@ class Pool:
         # This is the list of payments that we have not sent yet, to farmers
         self.pending_payments: Optional[asyncio.Queue] = None
 
-        # Keeps track of the latest state of our node
-        self.blockchain_state = {"peak": None}
-
-        # Whether or not the wallet is synced (required to make payments)
-        self.wallet_synced = False
-
         # We target these many partials for this number of seconds. We adjust after receiving this many partials.
         self.number_of_partials_target: int = pool_config["number_of_partials_target"]
         self.time_target: int = pool_config["time_target"]
@@ -167,12 +162,13 @@ class Pool:
         self.collect_pool_rewards_loop_task: Optional[asyncio.Task] = None
         self.create_payment_loop_task: Optional[asyncio.Task] = None
         self.submit_payment_loop_task: Optional[asyncio.Task] = None
-        self.get_peak_loop_task: Optional[asyncio.Task] = None
 
         self.node_rpc_client: Optional[FullNodeRpcClient] = None
         self.node_rpc_port = pool_config["node_rpc_port"]
         self.wallet_rpc_client: Optional[WalletRpcClient] = None
         self.wallet_rpc_port = pool_config["wallet_rpc_port"]
+
+        self.state_keeper = StateKeeper(self.log, self.wallet_fingerprint)
 
     async def start(self):
         await self.store.connect()
@@ -181,7 +177,7 @@ class Pool:
         await self.init_node_rpc()
         await self.init_wallet_rpc()
 
-        self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
+        await self.state_keeper.start(self.node_rpc_client, self.wallet_rpc_client)
 
         self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
 
@@ -189,7 +185,6 @@ class Pool:
         self.collect_pool_rewards_loop_task = asyncio.create_task(self.collect_pool_rewards_loop())
         self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
         self.submit_payment_loop_task = asyncio.create_task(self.submit_payment_loop())
-        self.get_peak_loop_task = asyncio.create_task(self.get_peak_loop())
 
         self.pending_payments = asyncio.Queue()
 
@@ -218,30 +213,13 @@ class Pool:
             self.create_payment_loop_task.cancel()
         if self.submit_payment_loop_task is not None:
             self.submit_payment_loop_task.cancel()
-        if self.get_peak_loop_task is not None:
-            self.get_peak_loop_task.cancel()
 
+        await self.state_keeper.stop()
         self.wallet_rpc_client.close()
         await self.wallet_rpc_client.await_closed()
         self.node_rpc_client.close()
         await self.node_rpc_client.await_closed()
         await self.store.connection.close()
-
-    async def get_peak_loop(self):
-        """
-        Periodically contacts the full node to get the latest state of the blockchain
-        """
-        while True:
-            try:
-                self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
-                self.wallet_synced = await self.wallet_rpc_client.get_synced()
-                await asyncio.sleep(30)
-            except asyncio.CancelledError:
-                self.log.info("Cancelled get_peak_loop, closing")
-                return
-            except Exception as e:
-                self.log.error(f"Unexpected error in get_peak_loop: {e}")
-                await asyncio.sleep(30)
 
     async def collect_pool_rewards_loop(self):
         """
@@ -251,12 +229,12 @@ class Pool:
 
         while True:
             try:
-                if not self.blockchain_state["sync"]["synced"]:
+                if not self.state_keeper.blockchain_state["sync"]["synced"]:
                     await asyncio.sleep(60)
                     continue
 
                 scan_phs: List[bytes32] = list(self.scan_p2_singleton_puzzle_hashes)
-                peak_height = self.blockchain_state["peak"].height
+                peak_height = self.state_keeper.blockchain_state["peak"].height
 
                 # Only get puzzle hashes with a certain number of confirmations or more, to avoid reorg issues
                 coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hashes(
@@ -323,7 +301,7 @@ class Pool:
                         spend_bundle = await create_absorb_transaction(
                             self.node_rpc_client,
                             rec,
-                            self.blockchain_state["peak"].height,
+                            self.state_keeper.blockchain_state["peak"].height,
                             ph_to_coins[rec.p2_singleton_puzzle_hash],
                             self.constants.GENESIS_CHALLENGE,
                         )
@@ -353,7 +331,7 @@ class Pool:
         """
         while True:
             try:
-                if not self.blockchain_state["sync"]["synced"]:
+                if not self.state_keeper.blockchain_state["sync"]["synced"]:
                     self.log.warning("Not synced, waiting")
                     await asyncio.sleep(60)
                     continue
@@ -426,9 +404,9 @@ class Pool:
     async def submit_payment_loop(self):
         while True:
             try:
-                peak_height = self.blockchain_state["peak"].height
+                peak_height = self.state_keeper.blockchain_state["peak"].height
                 await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
-                if not self.blockchain_state["sync"]["synced"] or not self.wallet_synced:
+                if not self.state_keeper.blockchain_state["sync"]["synced"] or not self.state_keeper.wallet_synced:
                     self.log.warning("Waiting for wallet sync")
                     await asyncio.sleep(60)
                     continue
@@ -459,7 +437,7 @@ class Pool:
                     or not (peak_height - transaction.confirmed_at_height) > self.confirmation_security_threshold
                 ):
                     transaction = await self.wallet_rpc_client.get_transaction(self.wallet_id, transaction.name)
-                    peak_height = self.blockchain_state["peak"].height
+                    peak_height = self.state_keeper.blockchain_state["peak"].height
                     self.log.info(
                         f"Waiting for transaction to obtain {self.confirmation_security_threshold} confirmations"
                     )
@@ -704,7 +682,7 @@ class Pool:
                     self.node_rpc_client,
                     launcher_id,
                     farmer_rec,
-                    self.blockchain_state["peak"].height,
+                    self.state_keeper.blockchain_state["peak"].height,
                     self.confirmation_security_threshold,
                     self.constants.GENESIS_CHALLENGE,
                 )
@@ -744,7 +722,7 @@ class Pool:
                 buried_singleton_tip.coin.name()
             )
             assert coin_record is not None
-            if self.blockchain_state["peak"].height - coin_record.confirmed_block_index > self.relative_lock_height:
+            if self.state_keeper.blockchain_state["peak"].height - coin_record.confirmed_block_index > self.relative_lock_height:
                 self.log.info(f"launcher_id {launcher_id} got enough confirmations to leave the pool")
                 is_pool_member = False
 

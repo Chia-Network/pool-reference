@@ -274,7 +274,9 @@ async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None):
     await runner.setup()
     site = aiohttp.web.TCPSite(runner, "0.0.0.0", int(80))
     await site.start()
-    await asyncio.sleep(10000000)
+
+    while True:
+        await asyncio.sleep(3600)
 
 
 async def stop():

@@ -678,7 +678,7 @@ class Pool:
         self.farmer_update_blocked.add(launcher_id)
         await asyncio.create_task(update_farmer_later())
 
-        return PutFarmerResponse.from_json_dict(response_dict).from_json_dict()
+        return PutFarmerResponse.from_json_dict(response_dict)
 
     async def get_and_validate_singleton_state(
         self, launcher_id: bytes32

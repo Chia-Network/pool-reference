@@ -94,7 +94,7 @@ async def get_singleton_state(
             assert next_coin_record is not None
 
             if not next_coin_record.spent:
-                if not validate_puzzle_hash(
+                if not await validate_puzzle_hash(
                     launcher_id,
                     delay_puzzle_hash,
                     delay_time,

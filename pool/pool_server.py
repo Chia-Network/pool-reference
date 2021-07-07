@@ -237,6 +237,9 @@ class PoolServer:
 
         self.pool.log.info(f"Login successful for launcher_id: {launcher_id.hex()}")
 
+        return await self.login_response(launcher_id)
+
+    async def login_response(self, launcher_id):
         record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(launcher_id)
         response = {}
         if record is not None:
@@ -244,7 +247,6 @@ class PoolServer:
             recent_partials = await self.pool.store.get_recent_partials(launcher_id, 20)
             response["recent_partials"] = recent_partials
 
-        # TODO(pool) Do what ever you like with the successful login
         return obj_to_response(response)
 
 
@@ -278,7 +280,9 @@ async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None):
     await runner.setup()
     site = aiohttp.web.TCPSite(runner, "0.0.0.0", int(80))
     await site.start()
-    await asyncio.sleep(10000000)
+
+    while True:
+        await asyncio.sleep(3600)
 
 
 async def stop():

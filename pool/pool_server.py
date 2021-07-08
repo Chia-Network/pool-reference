@@ -254,13 +254,15 @@ server: Optional[PoolServer] = None
 runner = None
 
 
-async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None):
+async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None,
+                            difficulty_function: Callable = get_new_difficulty,
+                            payment_manager: Optional[AbstractPaymentManager] = None):
     global server
     global runner
     config = load_config(DEFAULT_ROOT_PATH, "config.yaml")
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
     constants: ConsensusConstants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
-    server = PoolServer(config, constants, pool_store)
+    server = PoolServer(config, constants, pool_store, difficulty_function, payment_manager)
     await server.start()
 
     # TODO(pool): support TLS

@@ -78,6 +78,8 @@ class Pool:
         self.constants = constants
 
         self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        self.pool_fee = pool_config["pool_fee"]
+
         self.payment_manager: AbstractPaymentManager = payment_manger or DefaultPaymentManager(
             self.log, pool_config, self.constants)
 

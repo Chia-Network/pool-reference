@@ -16,10 +16,10 @@ wallet_id: 1
 node_rpc_port: 8555
 wallet_rpc_port: 9256
 partial_time_limit: 25
-partial_confirmation_delay: 30
+partial_confirmation_delay: 300
 scan_start_height: 1000
 collect_pool_rewards_interval: 600
-confirmation_security_threshold: 6
+confirmation_security_threshold: 32
 payment_interval: 600
 max_additions_per_transaction: 400
 number_of_partials_target: 300

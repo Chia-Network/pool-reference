@@ -136,7 +136,7 @@ class PoolServer:
 
     def post_metadata_from_request(self, request_obj):
         return RequestMetadata(
-            url=request_obj.url,
+            url=str(request_obj.url),
             scheme=request_obj.scheme,
             headers=request_obj.headers,
             cookies=dict(request_obj.cookies),

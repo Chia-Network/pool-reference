@@ -10,6 +10,7 @@ from chia.util.ints import uint64
 
 from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
+from ..util import RequestMetadata
 
 
 class SqlitePoolStore(AbstractPoolStore):
@@ -68,7 +69,7 @@ class SqlitePoolStore(AbstractPoolStore):
             True if row[10] == 1 else False,
         )
 
-    async def add_farmer_record(self, farmer_record: FarmerRecord):
+    async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
         cursor = await self.connection.execute(
             f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (

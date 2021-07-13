@@ -8,6 +8,7 @@ from chia.types.coin_solution import CoinSolution
 from chia.util.ints import uint64
 
 from ..record import FarmerRecord
+from ..util import RequestMetadata
 
 
 class AbstractPoolStore(ABC):
@@ -22,7 +23,7 @@ class AbstractPoolStore(ABC):
         """Perform IO-related initialization"""
 
     @abstractmethod
-    async def add_farmer_record(self, farmer_record: FarmerRecord):
+    async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
         """Persist a new Farmer in the store"""
 
     @abstractmethod

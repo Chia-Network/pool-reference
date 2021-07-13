@@ -124,6 +124,19 @@ async def get_singleton_state(
         return None
 
 
+def get_farmed_height(reward_coin_record: CoinRecord, genesis_challenge: bytes32) -> Optional[uint32]:
+    # Returns the height farmed if it's a coinbase reward, otherwise None
+    for block_index in range(
+        reward_coin_record.confirmed_block_index, reward_coin_record.confirmed_block_index - 128, -1
+    ):
+        if block_index < 0:
+            break
+        pool_parent = pool_parent_id(uint32(block_index), genesis_challenge)
+        if pool_parent == reward_coin_record.coin.parent_coin_info:
+            return uint32(block_index)
+    return None
+
+
 async def create_absorb_transaction(
     node_rpc_client: FullNodeRpcClient,
     farmer_record: FarmerRecord,
@@ -152,15 +165,7 @@ async def create_absorb_transaction(
 
     all_spends: List[CoinSolution] = []
     for reward_coin_record in reward_coin_records:
-        found_block_index: Optional[uint32] = None
-        for block_index in range(
-            reward_coin_record.confirmed_block_index, reward_coin_record.confirmed_block_index - 100, -1
-        ):
-            if block_index < 0:
-                break
-            pool_parent = pool_parent_id(uint32(block_index), genesis_challenge)
-            if pool_parent == reward_coin_record.coin.parent_coin_info:
-                found_block_index = uint32(block_index)
+        found_block_index: Optional[uint32] = get_farmed_height(reward_coin_record, genesis_challenge)
         if not found_block_index:
             # The puzzle does not allow spending coins that are not a coinbase reward
             log.info(f"Received reward {reward_coin_record.coin} that is not a pool reward.")

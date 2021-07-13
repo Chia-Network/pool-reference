@@ -269,6 +269,11 @@ class Pool:
                     if cr.confirmed_block_index > peak_height - self.confirmation_security_threshold:
                         not_buried_amounts += cr.coin.amount
                         continue
+
+                    if not get_farmed_height(cr, self.constants.GENESIS_CHALLENGE):
+                        self.log.info(f"Non coinbase coin: {cr.coin}, ignoring")
+                        continue
+
                     if cr.coin.puzzle_hash not in ph_to_amounts:
                         ph_to_amounts[cr.coin.puzzle_hash] = 0
                         ph_to_coins[cr.coin.puzzle_hash] = []
@@ -542,7 +547,10 @@ class Pool:
 
                 if farmer_record.is_pool_member:
                     await self.store.add_partial(partial.payload.launcher_id, uint64(int(time.time())), points_received)
-                    self.log.info(f"Farmer {farmer_record.launcher_id} updated points to: " f"{farmer_record.points + points_received}")
+                    self.log.info(
+                        f"Farmer {farmer_record.launcher_id} updated points to: "
+                        f"{farmer_record.points + points_received}"
+                    )
         except Exception as e:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")

@@ -271,12 +271,12 @@ class Pool:
                 ph_to_coins: Dict[bytes32, List[CoinRecord]] = {}
                 not_buried_amounts = 0
                 for cr in coin_records:
-                    if cr.confirmed_block_index > peak_height - self.confirmation_security_threshold:
-                        not_buried_amounts += cr.coin.amount
-                        continue
-
                     if not get_farmed_height(cr, self.constants.GENESIS_CHALLENGE):
                         self.log.info(f"Non coinbase coin: {cr.coin}, ignoring")
+                        continue
+
+                    if cr.confirmed_block_index > peak_height - self.confirmation_security_threshold:
+                        not_buried_amounts += cr.coin.amount
                         continue
 
                     if cr.coin.puzzle_hash not in ph_to_amounts:
@@ -382,7 +382,7 @@ class Pool:
                 pool_coin_amount = int(total_amount_claimed * self.pool_fee)
                 amount_to_distribute = total_amount_claimed - pool_coin_amount
 
-                if total_amount_claimed < 1.75:
+                if total_amount_claimed < 1.75 * (10 ** 12):
                     self.log.info(f"Do not have enough funds to distribute: {total_amount_claimed}, skipping payout")
                     continue
 

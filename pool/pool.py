@@ -40,7 +40,7 @@ from chia.util.lru_cache import LRUCache
 from chia.util.chia_logging import initialize_logging
 from chia.wallet.transaction_record import TransactionRecord
 from chia.pools.pool_puzzles import (
-    get_most_recent_singleton_coin_from_coin_solution,
+    get_most_recent_singleton_coin_from_coin_spend,
     get_delayed_puz_info_from_launcher_spend,
     launcher_id_to_p2_puzzle_hash,
 )
@@ -296,7 +296,7 @@ class Pool:
 
                 for rec in farmer_records:
                     if rec.is_pool_member:
-                        singleton_tip: Optional[Coin] = get_most_recent_singleton_coin_from_coin_solution(
+                        singleton_tip: Optional[Coin] = get_most_recent_singleton_coin_from_coin_spend(
                             rec.singleton_tip
                         )
                         if singleton_tip is None:

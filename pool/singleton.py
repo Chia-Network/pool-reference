@@ -6,7 +6,7 @@ from chia.consensus.coinbase import pool_parent_id
 from chia.pools.pool_puzzles import (
     create_absorb_spend,
     solution_to_extra_data,
-    get_most_recent_singleton_coin_from_coin_solution,
+    get_most_recent_singleton_coin_from_coin_spend,
     pool_state_to_inner_puzzle,
     create_full_puzzle,
     get_delayed_puz_info_from_launcher_spend,
@@ -86,7 +86,7 @@ async def get_singleton_state(
 
         while True:
             # Get next coin solution
-            next_coin: Optional[Coin] = get_most_recent_singleton_coin_from_coin_solution(last_solution)
+            next_coin: Optional[Coin] = get_most_recent_singleton_coin_from_coin_spend(last_solution)
             if next_coin is None:
                 # This means the singleton is invalid
                 return None

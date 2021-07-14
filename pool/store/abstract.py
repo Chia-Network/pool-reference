@@ -15,6 +15,7 @@ class AbstractPoolStore(ABC):
     """
     Base class for asyncio-related pool stores.
     """
+
     def __init__(self):
         self.lock = asyncio.Lock()
 

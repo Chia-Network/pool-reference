@@ -54,8 +54,13 @@ from .util import error_dict, RequestMetadata
 
 
 class Pool:
-    def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None,
-                 difficulty_function: Callable = get_new_difficulty):
+    def __init__(
+        self,
+        config: Dict,
+        constants: ConsensusConstants,
+        pool_store: Optional[AbstractPoolStore] = None,
+        difficulty_function: Callable = get_new_difficulty,
+    ):
         self.follow_singleton_tasks: Dict[bytes32, asyncio.Task] = {}
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
@@ -542,7 +547,10 @@ class Pool:
 
                 if farmer_record.is_pool_member:
                     await self.store.add_partial(partial.payload.launcher_id, uint64(int(time.time())), points_received)
-                    self.log.info(f"Farmer {farmer_record.launcher_id} updated points to: " f"{farmer_record.points + points_received}")
+                    self.log.info(
+                        f"Farmer {farmer_record.launcher_id} updated points to: "
+                        f"{farmer_record.points + points_received}"
+                    )
         except Exception as e:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")

@@ -17,7 +17,8 @@ class SqlitePoolStore(AbstractPoolStore):
     """
     Pool store based on SQLite.
     """
-    def __init__(self, db_path: Path = Path('pooldb.sqlite')):
+
+    def __init__(self, db_path: Path = Path("pooldb.sqlite")):
         super().__init__()
         self.db_path = db_path
         self.connection: Optional[aiosqlite.Connection] = None

@@ -322,8 +322,8 @@ class Pool:
                 request.payload.payout_instructions,
                 True,
             )
-            await self.store.add_farmer_record(farmer_record)
-            self.payment_manager.register_new_farmer(farmer_record, metadata)
+            await self.store.add_farmer_record(farmer_record, metadata)
+            self.payment_manager.register_new_farmer(farmer_record)
 
             return PostFarmerResponse(self.welcome_message).to_json_dict()
 

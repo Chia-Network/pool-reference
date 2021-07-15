@@ -95,6 +95,14 @@ class PoolServer:
             self.pool.authentication_token_timeout,
         )
         return obj_to_response(res)
+    
+     async def get_pool_stat(self, _) -> web.Response:
+        res: GetPoolStatResponse = GetPoolStatResponse(
+            self.pool.info_name,
+            self.pool.info_logo_url,
+            str(self.pool.pool_fee),
+        )
+        return obj_to_response(res)
 
     async def get_farmer(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
@@ -275,6 +283,7 @@ async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None):
     app.add_routes(
         [
             web.get("/", server.wrap_http_handler(server.index)),
+            web.get("/pool_stat", server.wrap_http_handler(server.get_pool_stat)
             web.get("/pool_info", server.wrap_http_handler(server.get_pool_info)),
             web.get("/farmer", server.wrap_http_handler(server.get_farmer)),
             web.post("/farmer", server.wrap_http_handler(server.post_farmer)),

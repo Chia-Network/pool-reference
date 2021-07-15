@@ -693,7 +693,7 @@ class Pool:
             self.log.info(f"Updated farmer: {response_dict}")
 
         self.farmer_update_blocked.add(launcher_id)
-        await asyncio.create_task(update_farmer_later())
+        asyncio.create_task(update_farmer_later())
 
         # TODO Fix chia-blockchain's Streamable implementation to support Optional in `from_json_dict`, then use
         # PutFarmerResponse here and in the trace up.

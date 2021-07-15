@@ -564,6 +564,21 @@ class Pool:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
 
+    async def validate_payout_instructions(self, payout_instructions: str) -> bool:
+        try:
+            if len(decode_puzzle_hash(payout_instructions)) == 32:
+                return True
+        except Exception:
+            # Not a Chia address
+            pass
+        try:
+            if len(hexstr_to_bytes(payout_instructions)) == 32:
+                return True
+        except Exception:
+            # Not a puzzle hash
+            pass
+        return False
+
     async def add_farmer(self, request: PostFarmerRequest, metadata: RequestMetadata) -> Dict:
         async with self.store.lock:
             farmer_record: Optional[FarmerRecord] = await self.store.get_farmer_record(request.payload.launcher_id)
@@ -592,10 +607,10 @@ class Pool:
             else:
                 difficulty = request.payload.suggested_difficulty
 
-            if len(hexstr_to_bytes(request.payload.payout_instructions)) != 32:
+            if not self.validate_payout_instructions(request.payload.payout_instructions):
                 return error_dict(
                     PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS,
-                    f"Payout instructions must be an xch address for this pool.",
+                    f"Payout instructions must be an xch address or puzzle hash for this pool.",
                 )
 
             if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
@@ -667,11 +682,12 @@ class Pool:
                 farmer_dict["authentication_public_key"] = request.payload.authentication_public_key
 
         if request.payload.payout_instructions is not None:
-            is_new_value = (
-                farmer_record.payout_instructions != request.payload.payout_instructions
-                and request.payload.payout_instructions is not None
-                and len(hexstr_to_bytes(request.payload.payout_instructions)) == 32
-            )
+            if not self.validate_payout_instructions(request.payload.payout_instructions):
+                return error_dict(
+                    PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS,
+                    f"Payout instructions must be an xch address or puzzle hash for this pool.",
+                )
+            is_new_value = farmer_record.payout_instructions != request.payload.payout_instructions
             response_dict["payout_instructions"] = is_new_value
             if is_new_value:
                 farmer_dict["payout_instructions"] = request.payload.payout_instructions

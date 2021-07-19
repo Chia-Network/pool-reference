@@ -678,7 +678,7 @@ class Pool:
 
         if request.payload.suggested_difficulty is not None:
             is_new_value = (
-                farmer_record.suggested_difficulty != request.payload.suggested_difficulty
+                farmer_record.difficulty != request.payload.suggested_difficulty
                 and request.payload.suggested_difficulty is not None
                 and request.payload.suggested_difficulty >= self.min_difficulty
             )

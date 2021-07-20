@@ -1,0 +1,20 @@
+# /etc/systemd/system/maxipool-payment.service
+[Unit]
+Description=MaxiPool payment service
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+EnvironmentFile=/home/ec2-user/.chia/maxipool.env
+WorkingDirectory=/home/ec2-user/pool-reference
+ExecStart=/home/ec2-user/pool-reference/venv/bin/python -m pool.payment
+StandardError=syslog
+SyslogIdentifier=maxipool-payment
+StartLimitInterval=0
+LimitNOFILE=65536
+LimitNPROC=65536
+
+[Install]
+WantedBy=multi-user.target

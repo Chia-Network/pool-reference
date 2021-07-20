@@ -197,8 +197,8 @@ class Pool:
 
         self.confirm_partials_loop_task = asyncio.create_task(self.confirm_partials_loop())
         # self.collect_pool_rewards_loop_task = asyncio.create_task(self.collect_pool_rewards_loop())
-        self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
-        self.submit_payment_loop_task = asyncio.create_task(self.submit_payment_loop())
+        # self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
+        # self.submit_payment_loop_task = asyncio.create_task(self.submit_payment_loop())
         self.get_peak_loop_task = asyncio.create_task(self.get_peak_loop())
 
         self.pending_payments = asyncio.Queue()

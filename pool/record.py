@@ -16,7 +16,7 @@ class FarmerRecord(Streamable):
     delay_time: uint64  # Backup time after which farmer can claim rewards directly, if pool unresponsive
     delay_puzzle_hash: bytes32  # Backup puzzlehash to claim rewards
     authentication_public_key: G1Element  # This is the latest public key of the farmer (signs all partials)
-    singleton_tip: CoinSpend  # Last coin solution that is buried in the blockchain, for this singleton
+    singleton_tip: CoinSpend  # Last coin spend that is buried in the blockchain, for this singleton
     singleton_tip_state: PoolState  # Current state of the singleton
     points: uint64  # Total points accumulated since last rest (or payout)
     difficulty: uint64  # Current difficulty for this farmer

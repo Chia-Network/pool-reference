@@ -607,7 +607,7 @@ class Pool:
             else:
                 difficulty = request.payload.suggested_difficulty
 
-            if not self.validate_payout_instructions(request.payload.payout_instructions):
+            if not await self.validate_payout_instructions(request.payload.payout_instructions):
                 return error_dict(
                     PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS,
                     f"Payout instructions must be an xch address or puzzle hash for this pool.",

@@ -682,7 +682,7 @@ class Pool:
                 farmer_dict["authentication_public_key"] = request.payload.authentication_public_key
 
         if request.payload.payout_instructions is not None:
-            if not self.validate_payout_instructions(request.payload.payout_instructions):
+            if not await self.validate_payout_instructions(request.payload.payout_instructions):
                 return error_dict(
                     PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS,
                     f"Payout instructions must be an xch address or puzzle hash for this pool.",

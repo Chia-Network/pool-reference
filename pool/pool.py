@@ -416,9 +416,6 @@ class Pool:
                         if len(additions_sub_list) > 0:
                             self.log.info(f"Will make payments: {additions_sub_list}")
                             await self.pending_payments.put(additions_sub_list.copy())
-
-                        # Subtract the points from each farmer
-                        await self.store.clear_farmer_points()
                     else:
                         self.log.info(f"No points for any farmer. Waiting {self.payment_interval}")
 
@@ -454,6 +451,9 @@ class Pool:
                     transaction: TransactionRecord = await self.wallet_rpc_client.send_transaction_multi(
                         self.wallet_id, payment_targets, fee=blockchain_fee
                     )
+
+                    # Subtract the points from each farmer
+                    await self.store.clear_farmer_points()
                 except ValueError as e:
                     self.log.error(f"Error making payment: {e}")
                     await asyncio.sleep(10)

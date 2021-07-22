@@ -634,7 +634,7 @@ class Pool:
 
             return PostFarmerResponse(self.welcome_message).to_json_dict()
 
-    async def update_farmer(self, request: PutFarmerRequest) -> Dict:
+    async def update_farmer(self, request: PutFarmerRequest, metadata: RequestMetadata) -> Dict:
         launcher_id = request.payload.launcher_id
         # First check if this launcher_id is currently blocked for farmer updates, if so there is no reason to validate
         # all the stuff below
@@ -688,7 +688,7 @@ class Pool:
 
         async def update_farmer_later():
             await asyncio.sleep(self.farmer_update_cooldown_seconds)
-            await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict))
+            await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict), metadata)
             self.farmer_update_blocked.remove(launcher_id)
             self.log.info(f"Updated farmer: {response_dict}")
 

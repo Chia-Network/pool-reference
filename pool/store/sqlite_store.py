@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, Set, List, Tuple, Dict
 
@@ -48,9 +49,25 @@ class SqlitePoolStore(AbstractPoolStore):
             "CREATE TABLE IF NOT EXISTS partial(launcher_id text, timestamp bigint, difficulty bigint)"
         )
 
+        await self.connection.execute(
+            """
+                CREATE TABLE IF NOT EXISTS payment(
+                    launcher_id text,
+                    puzzle_hash text,
+                    amount bigint,
+                    points bigint,
+                    timestamp bigint,
+                    transaction_id text,
+                    is_payment tinyint DEFAULT 0,
+                    is_confirmed tinyint DEFAULT 0
+                )
+            """
+        )
+
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on payment(launcher_id)")
 
         await self.connection.commit()
 
@@ -69,6 +86,15 @@ class SqlitePoolStore(AbstractPoolStore):
             row[9],
             True if row[10] == 1 else False,
         )
+
+    @asynccontextmanager
+    async def tx(self):
+        try:
+            yield
+            await self.connection.commit()
+        except Exception:
+            await self.connection.rollback()
+            raise
 
     async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
         cursor = await self.connection.execute(
@@ -146,27 +172,30 @@ class SqlitePoolStore(AbstractPoolStore):
         rows = await cursor.fetchall()
         return [self._row_to_farmer_record(row) for row in rows]
 
-    async def get_farmer_points_and_payout_instructions(self) -> List[Tuple[uint64, bytes]]:
-        cursor = await self.connection.execute(f"SELECT points, payout_instructions from farmer")
+    async def get_farmer_launcher_id_and_points_and_payout_instructions(self) -> List[Tuple[bytes32, uint64, bytes32]]:
+        cursor = await self.connection.execute(f"SELECT launcher_id, points, payout_instructions from farmer")
         rows = await cursor.fetchall()
-        accumulated: Dict[bytes32, uint64] = {}
+        accumulated: Dict[Tuple[bytes32, bytes32], uint64] = {}
         for row in rows:
-            points: uint64 = uint64(row[0])
-            ph: bytes32 = bytes32(bytes.fromhex(row[1]))
+            launcher_id: bytes32 = bytes32(bytes.fromhex(row[0]))
+            points: uint64 = uint64(row[1])
+            ph: bytes32 = bytes32(bytes.fromhex(row[2]))
             if ph in accumulated:
-                accumulated[ph] += points
+                accumulated[(launcher_id, ph)] += points
             else:
-                accumulated[ph] = points
+                accumulated[(launcher_id, ph)] = points
 
-        ret: List[Tuple[uint64, bytes32]] = []
-        for ph, total_points in accumulated.items():
-            ret.append((total_points, ph))
+        ret: List[Tuple[bytes32, uint64, bytes32]] = []
+        for (launcher_id, ph), total_points in accumulated.items():
+            ret.append((launcher_id, total_points, ph))
         return ret
 
-    async def clear_farmer_points(self) -> None:
+    async def clear_farmer_points(self, auto_commit: bool = True) -> None:
         cursor = await self.connection.execute(f"UPDATE farmer set points=0")
         await cursor.close()
-        await self.connection.commit()
+
+        if auto_commit is True:
+            await self.connection.commit()
 
     async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
         cursor = await self.connection.execute(
@@ -192,3 +221,117 @@ class SqlitePoolStore(AbstractPoolStore):
         rows = await cursor.fetchall()
         ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]
         return ret
+
+    async def add_payment(
+        self,
+        launcher_id: bytes32,
+        puzzle_hash: bytes32,
+        amount: uint64,
+        points: int,
+        timestamp: uint64,
+        is_payment: bool,
+        auto_commit: bool = True,
+    ):
+        cursor = await self.connection.execute(
+            """
+            INSERT INTO
+                payment (launcher_id, puzzle_hash, amount, points, timestamp, is_payment)
+            VALUES(?, ?, ?, ?, ?, ?)
+            """,
+            (launcher_id.hex(), puzzle_hash.hex(), amount, points, timestamp, int(is_payment)),
+        )
+        await cursor.close()
+
+        if auto_commit is True:
+            await self.connection.commit()
+
+    async def update_is_payment(
+        self,
+        launcher_id_and_timestamp: List[Tuple[bytes32, uint64]],
+        auto_commit: bool = True,
+    ):
+        cursor = await self.connection.executemany(
+            "UPDATE payment SET is_payment=1 WHERE launcher_id=? AND timestamp=?",
+            tuple(
+                (launcher_id.hex(), timestamp)
+                for launcher_id, timestamp in launcher_id_and_timestamp
+            ),
+        )
+        await cursor.close()
+
+        if auto_commit is True:
+            await self.connection.commit()
+
+    async def get_pending_payment_records(self, count: int) -> List[
+        Tuple[bytes32, bytes32, uint64, uint64, uint64, bool, bool]
+    ]:
+        cursor = await self.connection.execute(
+            """
+                SELECT
+                    launcher_id, puzzle_hash, amount, points, timestamp, is_payment, is_confirmed
+                FROM payment
+                WHERE is_payment=0 AND transaction_id IS NULL ORDER BY timestamp ASC LIMIT ?
+            """,
+            (count,),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        ret: List[
+            Tuple[bytes32, bytes32, uint64, uint64, uint64, bool, bool]
+        ] = [
+            (
+                bytes32(bytes.fromhex(launcher_id)),
+                bytes32(bytes.fromhex(puzzle_hash)),
+                uint64(amount),
+                uint64(points),
+                uint64(timestamp),
+                bool(is_payment),
+                bool(is_confirmed),
+            ) for launcher_id, puzzle_hash, amount, points, timestamp, is_payment, is_confirmed in rows
+        ]
+        return ret
+
+    async def get_pending_payment_count(self) -> int:
+        cursor = await self.connection.execute("SELECT COUNT(*) FROM payment WHERE is_payment=0")
+        count: int = (await cursor.fetchone())[0]
+        await cursor.close()
+        return count
+
+    async def get_confirming_payment_records(self) -> List[bytes32]:
+        cursor = await self.connection.execute(
+            """
+                SELECT
+                    DISTINCT transaction_id
+                FROM payment
+                WHERE is_payment=1 AND is_confirmed=0 AND transaction_id IS NOT NULL ORDER BY timestamp ASC
+            """,
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        ret: List[bytes32] = [
+            bytes32(bytes.fromhex(transaction_id[0])) for transaction_id in rows
+        ]
+        return ret
+
+    async def update_transaction_id(
+        self,
+        launcher_id_and_timestamp: List[Tuple[bytes32, uint64]],
+        transaction_id: bytes32,
+    ):
+        cursor = await self.connection.executemany(
+            "UPDATE payment SET transaction_id=? WHERE launcher_id=? AND timestamp=?",
+            tuple(
+                (transaction_id.hex(), launcher_id.hex(), timestamp)
+                for launcher_id, timestamp in launcher_id_and_timestamp
+            ),
+        )
+        await cursor.close()
+        await self.connection.commit()
+
+    async def update_is_confirmed(self, transaction_id: bytes32):
+        cursor = await self.connection.execute(
+            "UPDATE payment SET is_confirmed=1 WHERE transaction_id=?",
+            (transaction_id.hex(),),
+        )
+        await cursor.close()
+        await self.connection.commit()

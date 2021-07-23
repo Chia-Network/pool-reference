@@ -5,7 +5,7 @@ import aiosqlite
 from blspy import G1Element
 from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.types.coin_solution import CoinSolution
+from chia.types.coin_spend import CoinSpend
 from chia.util.ints import uint64
 
 from .abstract import AbstractPoolStore
@@ -65,7 +65,7 @@ class SqlitePoolStore(AbstractPoolStore):
             row[2],
             bytes.fromhex(row[3]),
             G1Element.from_bytes(bytes.fromhex(row[4])),
-            CoinSolution.from_bytes(row[5]),
+            CoinSpend.from_bytes(row[5]),
             PoolState.from_bytes(row[6]),
             row[7],
             row[8],
@@ -114,7 +114,7 @@ class SqlitePoolStore(AbstractPoolStore):
     async def update_singleton(
         self,
         launcher_id: bytes32,
-        singleton_tip: CoinSolution,
+        singleton_tip: CoinSpend,
         singleton_tip_state: PoolState,
         is_pool_member: bool,
     ):

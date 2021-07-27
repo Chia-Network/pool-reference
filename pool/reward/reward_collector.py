@@ -17,7 +17,7 @@ from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.chia_logging import initialize_logging
 from chia.pools.pool_puzzles import (
-    get_most_recent_singleton_coin_from_coin_solution,
+    get_most_recent_singleton_coin_from_coin_spend,
 )
 
 from pool.singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
@@ -187,7 +187,7 @@ class RewardCollector:
 
                 for rec in farmer_records:
                     if rec.is_pool_member:
-                        singleton_tip: Optional[Coin] = get_most_recent_singleton_coin_from_coin_solution(
+                        singleton_tip: Optional[Coin] = get_most_recent_singleton_coin_from_coin_spend(
                             rec.singleton_tip
                         )
                         if singleton_tip is None:

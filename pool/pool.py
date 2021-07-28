@@ -80,6 +80,12 @@ class Pool:
         self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
 
         self.pool_fee = pool_config["pool_fee"]
+        # Automatically delete rows in the partial table, default is false
+        self.auto_delete_partial = pool_config["auto_delete_partial"]
+        # Automatic deletion of records in partial, run interval (seconds)
+        self.auto_delete_partial_interval = pool_config["auto_delete_partial_interval"]
+        # How long to keep the records in the partial table (seconds)
+        self.partial_retetion_time = pool_config["partial_retetion_time"]
 
         # This number should be held constant and be consistent for every pool in the network. DO NOT CHANGE
         self.iters_limit = self.constants.POOL_SUB_SLOT_ITERS // 64
@@ -168,6 +174,7 @@ class Pool:
         self.create_payment_loop_task: Optional[asyncio.Task] = None
         self.submit_payment_loop_task: Optional[asyncio.Task] = None
         self.get_peak_loop_task: Optional[asyncio.Task] = None
+        self.auto_delete_partial_loop_task: Optional[asyncio.Task] = None
 
         self.node_rpc_client: Optional[FullNodeRpcClient] = None
         self.node_rpc_port = pool_config["node_rpc_port"]
@@ -200,6 +207,7 @@ class Pool:
         self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
         self.submit_payment_loop_task = asyncio.create_task(self.submit_payment_loop())
         self.get_peak_loop_task = asyncio.create_task(self.get_peak_loop())
+        self.auto_delete_partial_loop_task = asyncio.create_task(self.auto_delete_partial_loop())
 
         self.pending_payments = asyncio.Queue()
 
@@ -214,6 +222,8 @@ class Pool:
             self.submit_payment_loop_task.cancel()
         if self.get_peak_loop_task is not None:
             self.get_peak_loop_task.cancel()
+        if self.auto_delete_partial_loop_task is not None:
+            self.auto_delete_partial_loop_task.cancel()
 
         self.wallet_rpc_client.close()
         await self.wallet_rpc_client.await_closed()
@@ -237,6 +247,23 @@ class Pool:
                 self.log.error(f"Unexpected error in get_peak_loop: {e}")
                 await asyncio.sleep(30)
 
+    async def auto_delete_partial_loop(self):
+        """
+        Automatically delete expired data from partial table
+        """
+        while True:
+            try:
+                if self.auto_delete_partial:
+                    await self.store.auto_delete_partial(time.time() - self.partial_retetion_time)
+                    self.log.info("Run auto_delete_partial_loop")
+                await asyncio.sleep(self.auto_delete_partial_interval)
+            except asyncio.CancelledError:
+                self.log.info("Cancelled auto_delete_partial_loop, closing")
+                return
+            except Exception as e:
+                self.log.error(f"Unexpected error in auto_delete_partial_loop: {e}")
+                await asyncio.sleep(self.auto_delete_partial_interval)
+                
     async def collect_pool_rewards_loop(self):
         """
         Iterates through the blockchain, looking for pool rewards, and claims them, creating a transaction to the

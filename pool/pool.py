@@ -370,7 +370,9 @@ class Pool:
                 self.log.info("Starting to create payment")
 
                 coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hash(
-                    self.default_target_puzzle_hash, include_spent_coins=False
+                    self.default_target_puzzle_hash,
+                    include_spent_coins=False,
+                    start_height=self.scan_start_height,
                 )
 
                 if len(coin_records) == 0:

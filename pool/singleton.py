@@ -34,7 +34,7 @@ async def get_coin_spend(node_rpc_client: FullNodeRpcClient, coin_record: CoinRe
     return await node_rpc_client.get_puzzle_and_solution(coin_record.coin.name(), coin_record.spent_block_index)
 
 
-async def validate_puzzle_hash(
+def validate_puzzle_hash(
     launcher_id: bytes32,
     delay_ph: bytes32,
     delay_time: uint64,
@@ -92,7 +92,7 @@ async def get_singleton_state(
             assert next_coin_record is not None
 
             if not next_coin_record.spent:
-                if not await validate_puzzle_hash(
+                if not validate_puzzle_hash(
                     launcher_id,
                     delay_puzzle_hash,
                     delay_time,

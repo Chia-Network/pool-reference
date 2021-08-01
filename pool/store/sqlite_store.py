@@ -71,24 +71,49 @@ class SqlitePoolStore(AbstractPoolStore):
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
+        #Find the launcher_id exists.
         cursor = await self.connection.execute(
-            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                farmer_record.launcher_id.hex(),
-                farmer_record.p2_singleton_puzzle_hash.hex(),
-                farmer_record.delay_time,
-                farmer_record.delay_puzzle_hash.hex(),
-                bytes(farmer_record.authentication_public_key).hex(),
-                bytes(farmer_record.singleton_tip),
-                bytes(farmer_record.singleton_tip_state),
-                farmer_record.points,
-                farmer_record.difficulty,
-                farmer_record.payout_instructions,
-                int(farmer_record.is_pool_member),
-            ),
+            "SELECT * from farmer where launcher_id=?",
+            (farmer_record.launcher_id.hex(),),
         )
+        row = await cursor.fetchone()
+        #Insert for None
+        if row is None:
+            cursor = await self.connection.execute(
+	         f"INSERT INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	         (
+	             farmer_record.launcher_id.hex(),
+	             farmer_record.p2_singleton_puzzle_hash.hex(),
+	             farmer_record.delay_time,
+	             farmer_record.delay_puzzle_hash.hex(),
+	             bytes(farmer_record.authentication_public_key).hex(),
+	             bytes(farmer_record.singleton_tip),
+	             bytes(farmer_record.singleton_tip_state),
+	             farmer_record.points,
+	             farmer_record.difficulty,
+	             farmer_record.payout_instructions,
+	             int(farmer_record.is_pool_member),
+	         ),
+            )
+            #update for Exist
+        else:
+            cursor = await self.connection.execute(
+	         f"UPDATE farmer SET p2_singleton_puzzle_hash=?, delay_time=?, delay_puzzle_hash=?, authentication_public_key=?, singleton_tip=?, singleton_tip_state=?, payout_instructions=?, is_pool_member=? WHERE launcher_id=?",
+	         (
+	             farmer_record.p2_singleton_puzzle_hash.hex(),
+	             farmer_record.delay_time,
+	             farmer_record.delay_puzzle_hash.hex(),
+	             bytes(farmer_record.authentication_public_key).hex(),
+	             bytes(farmer_record.singleton_tip),
+	             bytes(farmer_record.singleton_tip_state),
+	             farmer_record.payout_instructions,
+	             int(farmer_record.is_pool_member),
+	             farmer_record.launcher_id.hex(),
+	         ),
+            )
         await cursor.close()
         await self.connection.commit()
+
 
     async def get_farmer_record(self, launcher_id: bytes32) -> Optional[FarmerRecord]:
         # TODO(pool): use cache

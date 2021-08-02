@@ -77,7 +77,7 @@ class SqlitePoolStore(AbstractPoolStore):
             (farmer_record.launcher_id.hex(),),
         )
         row = await cursor.fetchone()
-         # Insert for None
+        # Insert for None
         if row is None:
             cursor = await self.connection.execute(
 	         f"INSERT INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -95,7 +95,7 @@ class SqlitePoolStore(AbstractPoolStore):
 	             int(farmer_record.is_pool_member),
 	         ),
             )
-         # update for Exist
+        # update for Exist
         else:
             cursor = await self.connection.execute(
 	         f"UPDATE farmer SET "

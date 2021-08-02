@@ -71,13 +71,13 @@ class SqlitePoolStore(AbstractPoolStore):
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
-        #Find the launcher_id exists.
+        # Find the launcher_id exists.
         cursor = await self.connection.execute(
             "SELECT * from farmer where launcher_id=?",
             (farmer_record.launcher_id.hex(),),
         )
         row = await cursor.fetchone()
-        #Insert for None
+         # Insert for None
         if row is None:
             cursor = await self.connection.execute(
 	         f"INSERT INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -95,10 +95,19 @@ class SqlitePoolStore(AbstractPoolStore):
 	             int(farmer_record.is_pool_member),
 	         ),
             )
-            #update for Exist
+         # update for Exist
         else:
             cursor = await self.connection.execute(
-	         f"UPDATE farmer SET p2_singleton_puzzle_hash=?, delay_time=?, delay_puzzle_hash=?, authentication_public_key=?, singleton_tip=?, singleton_tip_state=?, payout_instructions=?, is_pool_member=? WHERE launcher_id=?",
+	         f"UPDATE farmer SET "
+	         f"p2_singleton_puzzle_hash=?, "
+	         f"delay_time=?, "
+	         f"delay_puzzle_hash=?, "
+	         f"authentication_public_key=?, "
+	         f"singleton_tip=?, "
+	         f"singleton_tip_state=?, "
+	         f"payout_instructions=?, "
+	         f"is_pool_member=? "
+	         f"WHERE launcher_id=?",
 	         (
 	             farmer_record.p2_singleton_puzzle_hash.hex(),
 	             farmer_record.delay_time,
@@ -113,7 +122,6 @@ class SqlitePoolStore(AbstractPoolStore):
             )
         await cursor.close()
         await self.connection.commit()
-
 
     async def get_farmer_record(self, launcher_id: bytes32) -> Optional[FarmerRecord]:
         # TODO(pool): use cache

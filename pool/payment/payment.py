@@ -206,8 +206,12 @@ class Payment:
                         # Subtract the points from each farmer
                         await self.store.clear_farmer_points()
 
+                        # TODO: keep a snapshot of the points collected by the farmer
+                        # await self.store.save_farmer_points_snapshot()
+
                         # TODO: Record payment data, including: laucher_id, payment amount, timestamp, payment coin type
                         # await self.store.record_payment()
+
                     else:
                         self.log.info(f"No points for any farmer. Waiting {self.payment_interval}")
 

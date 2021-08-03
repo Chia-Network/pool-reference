@@ -9,6 +9,7 @@ from chia.util.ints import uint64
 
 from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
+from ..util import RequestMetadata
 import asyncpg
 
 
@@ -65,7 +66,7 @@ class PGStore(AbstractPoolStore):
             True if row[10] == 1 else False,
         )
 
-    async def add_farmer_record(self, farmer_record: FarmerRecord):
+    async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
         await self.connection.execute(f"DELETE FROM farmer WHERE launcher_id=$1", farmer_record.launcher_id.hex())
         await self.connection.execute(
             f"INSERT INTO farmer VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",

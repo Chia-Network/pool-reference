@@ -46,6 +46,9 @@ class Payment:
         # Using 2164248527
         self.default_target_puzzle_hash: bytes32 = bytes32(decode_puzzle_hash(pool_config["default_target_address"]))
 
+        # Don't scan anything before this height, for efficiency (for example pool start date)
+        self.scan_start_height: uint32 = uint32(pool_config["scan_start_height"])
+
         # The pool fees will be sent to this address. This MUST be on a different key than the target_puzzle_hash,
         # otherwise, the fees will be sent to the users. Using 690783650
         self.pool_fee_puzzle_hash: bytes32 = bytes32(decode_puzzle_hash(pool_config["pool_fee_address"]))
@@ -156,7 +159,8 @@ class Payment:
                 self.log.info("Starting to create payment")
 
                 coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hash(
-                    self.default_target_puzzle_hash, include_spent_coins=False
+                    self.default_target_puzzle_hash, include_spent_coins=False,
+                    start_height=self.scan_start_height,
                 )
 
                 if len(coin_records) == 0:

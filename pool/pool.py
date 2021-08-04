@@ -551,10 +551,9 @@ class Pool:
                 )
 
                 if farmer_record.is_pool_member:
-                    # TODO: add harvester_id into partial table
-                    await self.store.add_partial(partial.payload.launcher_id, uint64(int(time.time())), points_received)
+                    await self.store.add_partial(partial.payload.launcher_id, partial.payload.harvester_id, uint64(int(time.time())), points_received)
                     self.log.info(
-                        f"Farmer {farmer_record.launcher_id} updated points to: "
+                        f"Farmer {farmer_record.launcher_id}/{partial.payload.harvester_id} updated points to: "
                         f"{farmer_record.points + points_received}"
                     )
         except Exception as e:

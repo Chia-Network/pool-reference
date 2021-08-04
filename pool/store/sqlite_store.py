@@ -45,7 +45,7 @@ class SqlitePoolStore(AbstractPoolStore):
         )
 
         await self.connection.execute(
-            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, timestamp bigint, difficulty bigint)"
+            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, harvester_id text, timestamp bigint, difficulty bigint)"
         )
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
@@ -168,10 +168,10 @@ class SqlitePoolStore(AbstractPoolStore):
         await cursor.close()
         await self.connection.commit()
 
-    async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
+    async def add_partial(self, launcher_id: bytes32, harvester_id: bytes32, timestamp: uint64, difficulty: uint64):
         cursor = await self.connection.execute(
-            "INSERT into partial VALUES(?, ?, ?)",
-            (launcher_id.hex(), timestamp, difficulty),
+            "INSERT into partial VALUES(?, ?, ?, ?)",
+            (launcher_id.hex(), harvester_id.hex(), timestamp, difficulty),
         )
         await cursor.close()
         cursor = await self.connection.execute(f"SELECT points from farmer where launcher_id=?", (launcher_id.hex(),))

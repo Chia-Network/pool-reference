@@ -42,7 +42,7 @@ class PGStore(AbstractPoolStore):
         )
 
         await self.connection.execute(
-            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, timestamp bigint, difficulty bigint)"
+            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, harvester_id text, timestamp bigint, difficulty bigint)"
         )
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
@@ -148,10 +148,10 @@ class PGStore(AbstractPoolStore):
     async def clear_farmer_points(self) -> None:
         await self.connection.execute(f"UPDATE farmer set points=0")
 
-    async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
+    async def add_partial(self, launcher_id: bytes32, harvester_id: bytes32, timestamp: uint64, difficulty: uint64):
         await self.connection.execute(
-            "INSERT into partial VALUES($1, $2, $3)",
-            launcher_id.hex(), timestamp, difficulty,
+            "INSERT into partial (launcher_id, harvester_id, timestamp, difficulty) VALUES($1, $2, $3, $4)",
+            launcher_id.hex(), harvester_id.hex(), timestamp, difficulty,
         )
         row = await self.connection.fetchrow(f"SELECT points from farmer where launcher_id=$1", launcher_id.hex())
         points = row[0]

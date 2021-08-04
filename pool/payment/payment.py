@@ -203,11 +203,11 @@ class Payment:
                             self.log.info(f"Will make payments: {additions_sub_list}")
                             await self.pending_payments.put(additions_sub_list.copy())
 
+                        # keep a snapshot of the points collected by the farmer
+                        await self.store.snapshot_farmer_points()
+
                         # Subtract the points from each farmer
                         await self.store.clear_farmer_points()
-
-                        # TODO: keep a snapshot of the points collected by the farmer
-                        # await self.store.save_farmer_points_snapshot()
 
                         # TODO: Record payment data, including: laucher_id, payment amount, timestamp, payment coin type
                         # await self.store.record_payment()

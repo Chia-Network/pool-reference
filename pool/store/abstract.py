@@ -59,6 +59,10 @@ class AbstractPoolStore(ABC):
         """Fetch all farmers and their respective payout instructions"""
 
     @abstractmethod
+    async def snapshot_farmer_points(self) -> None:
+        """Snapshot all Farmers' non-zero points"""
+
+    @abstractmethod
     async def clear_farmer_points(self) -> None:
         """Rest all Farmers' points to 0"""
 

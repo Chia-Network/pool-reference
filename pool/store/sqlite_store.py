@@ -67,7 +67,19 @@ class SqlitePoolStore(AbstractPoolStore):
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS payment_launcher_index on payment(launcher_id)")
 
+        # snapshot table to keep track of farmer's points
+        await self.connection.execute(
+            (
+                "CREATE TABLE IF NOT EXISTS points_ss("
+                "launcher_id text,"
+                "points bigint,"
+                "timestamp bigint)"
+            )
+        )
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS ss_launcher_id_index on points_ss(launcher_id)")
+
         await self.connection.commit()
+
 
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:
@@ -177,6 +189,15 @@ class SqlitePoolStore(AbstractPoolStore):
         for ph, total_points in accumulated.items():
             ret.append((total_points, ph))
         return ret
+
+    async def snapshot_farmer_points(self) -> None:
+        await self.connection.execute(
+            (
+                "INSERT into points_ss(launcher_id, points, timestamp)"
+                "SELECT launcher_id, points, datetime('now', 'unixepoch') from farmer"
+                "WHERE points != 0"
+            )
+        )
 
     async def clear_farmer_points(self) -> None:
         cursor = await self.connection.execute(f"UPDATE farmer set points=0")

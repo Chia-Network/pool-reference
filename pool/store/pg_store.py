@@ -10,6 +10,8 @@ from chia.util.ints import uint64
 from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
 from ..util import RequestMetadata
+from ..pay_record import PaymentRecord
+
 import asyncpg
 
 
@@ -48,6 +50,21 @@ class PGStore(AbstractPoolStore):
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
+
+        await self.connection.execute(
+            (
+                "CREATE TABLE IF NOT EXISTS payment("
+                "launcher_id text,"
+                "amount bigint,"
+                "payment_type text,"
+                "timestamp bigint,"
+                "points bigint,"
+                "txid text,"
+                "note text)"
+            )
+        )
+
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS payment_launcher_index on payment(launcher_id)")
 
 
     @staticmethod
@@ -166,3 +183,17 @@ class PGStore(AbstractPoolStore):
                 launcher_id.hex(), count,
             )]
         return ret
+
+    async def add_payment(self, payment: PaymentRecord):
+        await self.connection.execute(
+            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, txid, note) VALUES($1, $2, $3, $4, $5, $6, $7)",
+            *(
+                payment.launcher_id.hex(),
+                payment.payment_amount,
+                payment.payment_type,
+                payment.timestamp,
+                payment.points,
+                payment.txid,
+                payment.note
+            ),
+        )

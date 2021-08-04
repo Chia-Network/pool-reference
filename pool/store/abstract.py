@@ -9,7 +9,7 @@ from chia.util.ints import uint64
 
 from ..record import FarmerRecord
 from ..util import RequestMetadata
-
+from ..pay_record import PaymentRecord
 
 class AbstractPoolStore(ABC):
     """
@@ -69,3 +69,7 @@ class AbstractPoolStore(ABC):
     @abstractmethod
     async def get_recent_partials(self, launcher_id: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
         """Fetch last ``count`` partials for Farmer identified by ``launcher_id``"""
+
+    @abstractmethod
+    async def add_payment(self, payment_record: PaymentRecord):
+        """Add new payment record for farmer"""

@@ -11,7 +11,7 @@ from chia.util.ints import uint64
 from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
 from ..util import RequestMetadata
-
+from ..pay_record import PaymentRecord
 
 class SqlitePoolStore(AbstractPoolStore):
     """
@@ -51,6 +51,21 @@ class SqlitePoolStore(AbstractPoolStore):
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
         await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
+
+        await self.connection.execute(
+            (
+                "CREATE TABLE IF NOT EXISTS payment("
+                "launcher_id text,"
+                "amount bigint,"
+                "payment_type text,"
+                "timestamp bigint,"
+                "points bigint,"
+                "txid text,"
+                "note text)"
+            )
+        )
+
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS payment_launcher_index on payment(launcher_id)")
 
         await self.connection.commit()
 
@@ -192,3 +207,19 @@ class SqlitePoolStore(AbstractPoolStore):
         rows = await cursor.fetchall()
         ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]
         return ret
+
+    async def add_payment(self, payment: PaymentRecord):
+        cursor = await self.connection.execute(
+            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, txid, note) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (
+		payment.launcher_id.hex(),
+		payment.payment_amount,
+		payment.payment_type,
+		payment.timestamp,
+		payment.points,
+		payment.txid,
+		payment.note
+	    ),
+        )
+        await cursor.close()
+        await self.connection.commit()

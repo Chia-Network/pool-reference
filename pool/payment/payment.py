@@ -239,20 +239,6 @@ class Payment:
 
                 self.log.info(f"Submitting a payment: {payment_targets}")
 
-                # TODO(pool): make sure you have enough to pay the blockchain fee, this will be taken out of the pool
-                # fee itself. Alternatively you can set it to 0 and wait longer
-                # blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
-                blockchain_fee: uint64 = uint64(0)
-                try:
-                    transaction: TransactionRecord = await self.wallet_rpc_client.send_transaction_multi(
-                        self.wallet_id, payment_targets, fee=blockchain_fee
-                    )
-                except ValueError as e:
-                    self.log.error(f"Error making payment: {e}")
-                    await asyncio.sleep(10)
-                    await self.pending_payments.put(payment_targets)
-                    continue
-
                 # add payment record for each launcher
                 for payment_target in payment_targets:
                     payment = PaymentRecord(
@@ -266,6 +252,20 @@ class Payment:
                     )
                     self.log.info(f"payment record: {payment}")
                     await self.store.add_payment(payment)
+
+                # TODO(pool): make sure you have enough to pay the blockchain fee, this will be taken out of the pool
+                # fee itself. Alternatively you can set it to 0 and wait longer
+                # blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
+                blockchain_fee: uint64 = uint64(0)
+                try:
+                    transaction: TransactionRecord = await self.wallet_rpc_client.send_transaction_multi(
+                        self.wallet_id, payment_targets, fee=blockchain_fee
+                    )
+                except ValueError as e:
+                    self.log.error(f"Error making payment: {e}")
+                    await asyncio.sleep(10)
+                    await self.pending_payments.put(payment_targets)
+                    continue
 
                 self.log.info(f"Transaction: {transaction}")
 

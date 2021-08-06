@@ -624,6 +624,7 @@ class Pool:
                 difficulty,
                 request.payload.payout_instructions,
                 True,
+                uint64(time.time()),
             )
             self.scan_p2_singleton_puzzle_hashes.add(p2_singleton_puzzle_hash)
             await self.store.add_farmer_record(farmer_record, metadata)

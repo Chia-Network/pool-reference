@@ -40,7 +40,8 @@ class PGStore(AbstractPoolStore):
                 " points bigint,"
                 " difficulty bigint,"
                 " payout_instructions text,"
-                " is_pool_member smallint)"
+                " is_pool_member smallint,"
+                " create_at bigint)"
             )
         )
 
@@ -106,12 +107,13 @@ class PGStore(AbstractPoolStore):
             row[8],
             row[9],
             True if row[10] == 1 else False,
+            row[11],
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
         await self.connection.execute(f"DELETE FROM farmer WHERE launcher_id=$1", farmer_record.launcher_id.hex())
         await self.connection.execute(
-            f"INSERT INTO farmer VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            f"INSERT INTO farmer VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
             *(
                 farmer_record.launcher_id.hex(),
                 farmer_record.p2_singleton_puzzle_hash.hex(),
@@ -123,7 +125,8 @@ class PGStore(AbstractPoolStore):
                 farmer_record.points,
                 farmer_record.difficulty,
                 farmer_record.payout_instructions,
-                int(farmer_record.is_pool_member),
+                int(farmer_record.is_pool_member,
+                farmer_record.create_at),
             ),
         )
 

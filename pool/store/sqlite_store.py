@@ -41,7 +41,8 @@ class SqlitePoolStore(AbstractPoolStore):
                 " points bigint,"
                 " difficulty bigint,"
                 " payout_instructions text,"
-                " is_pool_member tinyint)"
+                " is_pool_member tinyint,"
+                " create_at bigint)"
             )
         )
 
@@ -110,11 +111,12 @@ class SqlitePoolStore(AbstractPoolStore):
             row[8],
             row[9],
             True if row[10] == 1 else False,
+            row[11],
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
         cursor = await self.connection.execute(
-            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT OR REPLACE INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 farmer_record.launcher_id.hex(),
                 farmer_record.p2_singleton_puzzle_hash.hex(),
@@ -127,6 +129,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 farmer_record.difficulty,
                 farmer_record.payout_instructions,
                 int(farmer_record.is_pool_member),
+                farmer_record.create_at,
             ),
         )
         await cursor.close()

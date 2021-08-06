@@ -74,6 +74,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 "CREATE TABLE IF NOT EXISTS points_ss("
                 "launcher_id text,"
                 "points bigint,"
+                "delay_time bigint,"
                 "timestamp bigint)"
             )
         )
@@ -207,8 +208,8 @@ class SqlitePoolStore(AbstractPoolStore):
     async def snapshot_farmer_points(self) -> None:
         await self.connection.execute(
             (
-                "INSERT into points_ss(launcher_id, points, timestamp)"
-                "SELECT launcher_id, points, datetime('now', 'unixepoch') from farmer"
+                "INSERT into points_ss(launcher_id, points, timestamp, delay_time)"
+                "SELECT launcher_id, points, datetime('now', 'unixepoch'), delay_time from farmer"
                 "WHERE points != 0"
             )
         )

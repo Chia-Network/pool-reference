@@ -190,7 +190,7 @@ class Payment:
                         self.log.info(f"Paying out {mojo_per_point} mojo / point")
 
                         additions_sub_list: List[Dict] = [
-                            {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount, "launcher_id": 0, "points": 0}
+                            {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount, "launcher_id": self.default_target_puzzle_hash, "points": 0}
                         ]
                         for points, ph, launcher in points_and_ph:
                             if points > 0:
@@ -241,14 +241,15 @@ class Payment:
 
                 # add payment record for each launcher
                 for payment_target in payment_targets:
+                    self.log.info(f"payment_target : {payment_target}")
                     payment = PaymentRecord(
-                        payment_target["launcher_id"],
-                        payment_target["amount"],
-                        payment_target["points"],
+                        bytes32(payment_target["launcher_id"]),
+                        uint64(payment_target["amount"]),
+                        uint64(payment_target["points"]),
                         uint64(time.time()),
                         "XCH",
-                        "",
-                        "",
+                        "n/a",
+                        "n/a",
                     )
                     self.log.info(f"payment record: {payment}")
                     await self.store.add_payment(payment)

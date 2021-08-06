@@ -12,6 +12,7 @@ from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
 from ..util import RequestMetadata
 from ..pay_record import PaymentRecord
+from ..reward_record import RewardRecord
 
 class SqlitePoolStore(AbstractPoolStore):
     """
@@ -77,6 +78,19 @@ class SqlitePoolStore(AbstractPoolStore):
             )
         )
         await self.connection.execute("CREATE INDEX IF NOT EXISTS ss_launcher_id_index on points_ss(launcher_id)")
+
+        # create rewards tx table
+        await self.connection.execute(
+            (
+                "CREATE TABLE IF NOT EXISTS rewards_tx("
+                "launcher_id text,  /* farmer*/"
+                "claimable bigint,  /* block reward*/"
+                "height bigint,     /* block height of the reward*/"
+                "coins text,        /* coin hash*/"
+                "timestamp bigint   /* timestamp of the record */)"
+            )
+        )
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS re_launcher_id_index on rewards_tx(launcher_id)")
 
         await self.connection.commit()
 
@@ -241,6 +255,20 @@ class SqlitePoolStore(AbstractPoolStore):
 		payment.txid,
 		payment.note
 	    ),
+        )
+        await cursor.close()
+        await self.connection.commit()
+
+    async def add_reward_record(self, reward: RewardRecord):
+        cursor = await self.connection.execute(
+            f"INSERT INTO rewards_tx(launcher_id, claimable, height, coins, timestamp) VALUES(?, ?, ?, ?, ?)",
+            (
+                reward.launcher_id.hex(),
+                reward.claimable,
+                reward.height,
+                reward.coins.hex(),
+                reward.timestamp
+            )
         )
         await cursor.close()
         await self.connection.commit()

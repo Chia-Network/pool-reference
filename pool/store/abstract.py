@@ -10,6 +10,7 @@ from chia.util.ints import uint64
 from ..record import FarmerRecord
 from ..util import RequestMetadata
 from ..pay_record import PaymentRecord
+from ..reward_record import RewardRecord
 
 class AbstractPoolStore(ABC):
     """
@@ -77,3 +78,7 @@ class AbstractPoolStore(ABC):
     @abstractmethod
     async def add_payment(self, payment_record: PaymentRecord):
         """Add new payment record for farmer"""
+
+    @abstractmethod
+    async def add_reward_record(self, reward: RewardRecord):
+        """Add reward claim record"""

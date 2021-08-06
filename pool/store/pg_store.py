@@ -11,6 +11,7 @@ from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
 from ..util import RequestMetadata
 from ..pay_record import PaymentRecord
+from ..reward_record import RewardRecord
 
 import asyncpg
 
@@ -54,13 +55,13 @@ class PGStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "CREATE TABLE IF NOT EXISTS payment("
-                "launcher_id text,"
-                "amount bigint,"
-                "payment_type text,"
-                "timestamp bigint,"
-                "points bigint,"
-                "txid text,"
-                "note text)"
+                "launcher_id text,  /* farmer */"
+                "amount bigint,     /* amount paid */"
+                "payment_type text, /* payment type: xch, wxch, maxi */"
+                "timestamp bigint,  /* payment timestamp */"
+                "points bigint,     /* points of farmer */"
+                "txid text,         /* payment tx id*/"
+                "note text          /* additional note */)"
             )
         )
 
@@ -70,9 +71,9 @@ class PGStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "CREATE TABLE IF NOT EXISTS points_ss("
-                "launcher_id text,"
-                "points bigint,"
-                "timestamp bigint)"
+                "launcher_id text, /* farmer */"
+                "points bigint,    /* farmer's points */"
+                "timestamp bigint  /* snapshot timestamp */)"
             )
         )
         await self.connection.execute("CREATE INDEX IF NOT EXISTS ss_launcher_id_index on points_ss(launcher_id)")
@@ -81,11 +82,11 @@ class PGStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "CREATE TABLE IF NOT EXISTS rewards_tx("
-                "launcher_id text,"
-                "claimable bigint,"
-                "height bigint,"
-                "coins text,"
-                "timestamp bigint)"
+                "launcher_id text,  /* farmer*/"
+                "claimable bigint,  /* block reward*/"
+                "height bigint,     /* block height of the reward*/"
+                "coins text,        /* coin hash*/"
+                "timestamp bigint   /* timestamp of the record */)"
             )
         )
         await self.connection.execute("CREATE INDEX IF NOT EXISTS re_launcher_id_index on rewards_tx(launcher_id)")
@@ -226,5 +227,17 @@ class PGStore(AbstractPoolStore):
                 payment.points,
                 payment.txid,
                 payment.note
+            ),
+        )
+
+    async def add_reward_record(self, reward: RewardRecord):
+        await self.connection.execute(
+            f"INSERT INTO rewards_tx(launcher_id, claimable, height, coins, timestamp) VALUES($1, $2, $3, $4, $5)",
+            *(
+                reward.launcher_id.hex(),
+                reward.claimable,
+                reward.height,
+                reward.coins.hex(),
+                reward.timestamp
             ),
         )

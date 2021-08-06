@@ -6,6 +6,7 @@ from typing import Dict, Optional, Set, List
 
 import os
 import yaml
+import time
 
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
@@ -24,6 +25,7 @@ from pool.singleton import create_absorb_transaction, get_singleton_state, get_c
 from pool.store.abstract import AbstractPoolStore
 from pool.store.sqlite_store import SqlitePoolStore
 
+from ..reward_record import RewardRecord
 
 class RewardCollector:
     def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
@@ -219,6 +221,14 @@ class RewardCollector:
                         push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
                         if push_tx_response["status"] == "SUCCESS":
                             # TODO(pool): save transaction in records
+                            reward = RewardRecord(
+                                rec.launcher_id,
+                                claimable_amounts,
+                                self.blockchain_state["peak"].height,
+                                rec.p2_singleton_puzzle_hash,
+                                uint64(time.time())
+                            )
+                            await self.store.add_reward_record(reward)
                             self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
                         else:
                             self.log.error(f"Error submitting transaction: {push_tx_response}")

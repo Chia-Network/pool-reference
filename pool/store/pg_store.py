@@ -172,19 +172,25 @@ class PGStore(AbstractPoolStore):
             *puzzle_hashes_db,
         )]
 
-    async def get_farmer_points_and_payout_instructions(self) -> List[Tuple[uint64, bytes]]:
+    async def get_farmer_points_and_payout_instructions(self) -> List[Tuple[uint64, bytes, bytes]]:
         accumulated: Dict[bytes32, uint64] = {}
-        for row in await self.connection.fetch(f"SELECT points, payout_instructions from farmer"):
+        launcher_points: Dict[bytes32, bytes32] = {}
+        for row in await self.connection.fetch(f"SELECT points, payout_instructions, launcher_id from farmer"):
             points: uint64 = uint64(row[0])
             ph: bytes32 = bytes32(bytes.fromhex(row[1]))
+            la: bytes32 = bytes32(bytes.fromhex(row[2]))
             if ph in accumulated:
                 accumulated[ph] += points
             else:
                 accumulated[ph] = points
+            # FIXME: only the first launcher id is recorded
+            # If there are multiple launcher id using the same payout_instructions
+            # It will cause confusion, as only one launcher seems got paid
+                launcher_points[ph] = la
 
         ret: List[Tuple[uint64, bytes32]] = []
         for ph, total_points in accumulated.items():
-            ret.append((total_points, ph))
+            ret.append((total_points, ph, launcher_points[ph]))
         return ret
 
     async def snapshot_farmer_points(self) -> None:

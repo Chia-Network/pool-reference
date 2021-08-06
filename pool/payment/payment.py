@@ -7,6 +7,7 @@ from typing import Dict, Optional, Set, List, Tuple, Callable
 
 import os
 import yaml
+import time
 
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.coin_record import CoinRecord
@@ -22,6 +23,7 @@ from chia.wallet.transaction_record import TransactionRecord
 from pool.store.abstract import AbstractPoolStore
 from pool.store.sqlite_store import SqlitePoolStore
 
+from ..pay_record import PaymentRecord
 
 class Payment:
     def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
@@ -180,19 +182,19 @@ class Payment:
                     # Get the points of each farmer, as well as payout instructions. Here a chia address is used,
                     # but other blockchain addresses can also be used.
                     points_and_ph: List[
-                        Tuple[uint64, bytes]
+                        Tuple[uint64, bytes, bytes]
                     ] = await self.store.get_farmer_points_and_payout_instructions()
-                    total_points = sum([pt for (pt, ph) in points_and_ph])
+                    total_points = sum([pt for (pt, ph, la) in points_and_ph])
                     if total_points > 0:
                         mojo_per_point = floor(amount_to_distribute / total_points)
                         self.log.info(f"Paying out {mojo_per_point} mojo / point")
 
                         additions_sub_list: List[Dict] = [
-                            {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount}
+                            {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount, "launcher_id": 0, "points": 0}
                         ]
-                        for points, ph in points_and_ph:
+                        for points, ph, launcher in points_and_ph:
                             if points > 0:
-                                additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point})
+                                additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point, "launcher_id": launcher, "points": points})
 
                             if len(additions_sub_list) == self.max_additions_per_transaction:
                                 await self.pending_payments.put(additions_sub_list.copy())
@@ -209,8 +211,6 @@ class Payment:
                         # Subtract the points from each farmer
                         await self.store.clear_farmer_points()
 
-                        # TODO: Record payment data, including: laucher_id, payment amount, timestamp, payment coin type
-                        # await self.store.record_payment()
 
                     else:
                         self.log.info(f"No points for any farmer. Waiting {self.payment_interval}")
@@ -253,6 +253,20 @@ class Payment:
                     await self.pending_payments.put(payment_targets)
                     continue
 
+                # add payment record for each launcher
+                for payment_target in payment_targets:
+                    payment = PaymentRecord(
+                        payment_target["launcher_id"],
+                        payment_target["amount"],
+                        "XCH",
+                        uint64(time.time()),
+                        payment_target["points"],
+                        "",
+                        ""
+                    )
+                    self.log.info(f"payment record: {payment}")
+                    await self.store.add_payment(payment)
+
                 self.log.info(f"Transaction: {transaction}")
 
                 while (
@@ -278,5 +292,6 @@ class Payment:
                 return
             except Exception as e:
                 # TODO(pool): retry transaction if failed
-                self.log.error(f"Unexpected error in submit_payment_loop: {e}")
+                error_stack = traceback.format_exc()
+                self.log.error(f"Unexpected error in submit_payment_loop: {e} {error_stack}")
                 await asyncio.sleep(60)

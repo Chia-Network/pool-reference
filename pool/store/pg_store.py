@@ -125,8 +125,8 @@ class PGStore(AbstractPoolStore):
                 farmer_record.points,
                 farmer_record.difficulty,
                 farmer_record.payout_instructions,
-                int(farmer_record.is_pool_member,
-                farmer_record.create_at),
+                int(farmer_record.is_pool_member),
+                farmer_record.create_at,
             ),
         )
 

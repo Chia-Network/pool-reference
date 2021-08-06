@@ -244,11 +244,11 @@ class Payment:
                     payment = PaymentRecord(
                         payment_target["launcher_id"],
                         payment_target["amount"],
-                        "XCH",
-                        uint64(time.time()),
                         payment_target["points"],
+                        uint64(time.time()),
+                        "XCH",
                         "",
-                        ""
+                        "",
                     )
                     self.log.info(f"payment record: {payment}")
                     await self.store.add_payment(payment)

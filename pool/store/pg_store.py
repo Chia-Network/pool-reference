@@ -200,7 +200,7 @@ class PGStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "INSERT into points_ss (launcher_id, points, timestamp, delay_time)"
-                "SELECT launcher_id, points, extract(epoch from now()) * 1000, delay_time from farmer WHERE points != 0"
+                "SELECT launcher_id, points, trunc(extract(epoch from now())), delay_time from farmer WHERE points != 0"
             )
         )
 

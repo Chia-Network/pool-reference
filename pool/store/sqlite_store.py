@@ -218,7 +218,7 @@ class SqlitePoolStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "INSERT into points_ss(launcher_id, points, timestamp, delay_time)"
-                "SELECT launcher_id, points, datetime('now', 'unixepoch'), delay_time from farmer"
+                "SELECT launcher_id, points, strftime('%s', 'now'), delay_time from farmer"
                 "WHERE points != 0"
             )
         )

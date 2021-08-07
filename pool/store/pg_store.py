@@ -29,7 +29,7 @@ class PGStore(AbstractPoolStore):
         self.connection = await asyncpg.connect('postgresql://postgres@localhost/maxipool')
         await self.connection.execute(
             (
-                "CREATE TABLE IF NOT EXISTS farmer("
+                "CREATE TABLE IF NOT EXISTS maxi_farmer("
                 "launcher_id text PRIMARY KEY,"
                 " p2_singleton_puzzle_hash text,"
                 " delay_time bigint,"
@@ -46,16 +46,16 @@ class PGStore(AbstractPoolStore):
         )
 
         await self.connection.execute(
-            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, harvester_id text, timestamp bigint, difficulty bigint)"
+            "CREATE TABLE IF NOT EXISTS maxi_partial(launcher_id text, harvester_id text, timestamp bigint, difficulty bigint)"
         )
 
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on partial(timestamp)")
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on maxi_farmer(p2_singleton_puzzle_hash)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS timestamp_index on maxi_partial(timestamp)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on maxi_partial(launcher_id)")
 
         await self.connection.execute(
             (
-                "CREATE TABLE IF NOT EXISTS payment("
+                "CREATE TABLE IF NOT EXISTS maxi_payment("
                 "launcher_id text,  /* farmer */"
                 "amount bigint,     /* amount paid */"
                 "payment_type text, /* payment type: xch, wxch, maxi */"
@@ -66,24 +66,24 @@ class PGStore(AbstractPoolStore):
             )
         )
 
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS payment_launcher_index on payment(launcher_id)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS payment_launcher_index on maxi_payment(launcher_id)")
 
         # snapshot table to keep track of farmer's points
         await self.connection.execute(
             (
-                "CREATE TABLE IF NOT EXISTS points_ss("
+                "CREATE TABLE IF NOT EXISTS maxi_points_ss("
                 "launcher_id text,  /* farmer */"
                 "points bigint,     /* farmer's points */"
                 "delay_time bigint, /* delayed time */"
                 "timestamp bigint  /* snapshot timestamp */)"
             )
         )
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS ss_launcher_id_index on points_ss(launcher_id)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS ss_launcher_id_index on maxi_points_ss(launcher_id)")
 
         # create rewards tx table
         await self.connection.execute(
             (
-                "CREATE TABLE IF NOT EXISTS rewards_tx("
+                "CREATE TABLE IF NOT EXISTS maxi_rewards_tx("
                 "launcher_id text,  /* farmer*/"
                 "claimable bigint,  /* block reward*/"
                 "height bigint,     /* block height of the reward*/"
@@ -91,7 +91,7 @@ class PGStore(AbstractPoolStore):
                 "timestamp bigint   /* timestamp of the record */)"
             )
         )
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS re_launcher_id_index on rewards_tx(launcher_id)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS re_launcher_id_index on maxi_rewards_tx(launcher_id)")
 
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:
@@ -111,9 +111,9 @@ class PGStore(AbstractPoolStore):
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
-        await self.connection.execute(f"DELETE FROM farmer WHERE launcher_id=$1", farmer_record.launcher_id.hex())
+        await self.connection.execute(f"DELETE FROM maxi_farmer WHERE launcher_id=$1", farmer_record.launcher_id.hex())
         await self.connection.execute(
-            f"INSERT INTO farmer VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+            f"INSERT INTO maxi_farmer VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
             *(
                 farmer_record.launcher_id.hex(),
                 farmer_record.p2_singleton_puzzle_hash.hex(),
@@ -132,7 +132,7 @@ class PGStore(AbstractPoolStore):
 
     async def get_farmer_record(self, launcher_id: bytes32) -> Optional[FarmerRecord]:
         row = await self.connection.fetchrow(
-            "SELECT * from farmer where launcher_id=$1",
+            "SELECT * from maxi_farmer where launcher_id=$1",
             launcher_id.hex(),
         )
         if row is None:
@@ -141,7 +141,7 @@ class PGStore(AbstractPoolStore):
 
     async def update_difficulty(self, launcher_id: bytes32, difficulty: uint64):
         await self.connection.execute(
-            f"UPDATE farmer SET difficulty=$1 WHERE launcher_id=$2", difficulty, launcher_id.hex()
+            f"UPDATE maxi_farmer SET difficulty=$1 WHERE launcher_id=$2", difficulty, launcher_id.hex()
         )
 
     async def update_singleton(
@@ -156,13 +156,13 @@ class PGStore(AbstractPoolStore):
         else:
             entry = (bytes(singleton_tip), bytes(singleton_tip_state), 0, launcher_id.hex())
         await self.connection.execute(
-            f"UPDATE farmer SET singleton_tip=$1, singleton_tip_state=$2, is_pool_member=$3 WHERE launcher_id=$4",
+            f"UPDATE maxi_farmer SET singleton_tip=$1, singleton_tip_state=$2, is_pool_member=$3 WHERE launcher_id=$4",
             *entry,
         )
 
     async def get_pay_to_singleton_phs(self) -> Set[bytes32]:
         all_phs: Set[bytes32] = set()
-        for row in await self.connection.fetch("SELECT p2_singleton_puzzle_hash from farmer"):
+        for row in await self.connection.fetch("SELECT p2_singleton_puzzle_hash from maxi_farmer"):
             all_phs.add(bytes32(bytes.fromhex(row[0])))
         return all_phs
 
@@ -171,14 +171,14 @@ class PGStore(AbstractPoolStore):
             return []
         puzzle_hashes_db = tuple([ph.hex() for ph in list(puzzle_hashes)])
         return [self._row_to_farmer_record(row) for row in await self.connection.fetch(
-            f'SELECT * from farmer WHERE p2_singleton_puzzle_hash in (${",$".join(map(str, range(1, len(puzzle_hashes_db)+1)))}) ',
+            f'SELECT * from maxi_farmer WHERE p2_singleton_puzzle_hash in (${",$".join(map(str, range(1, len(puzzle_hashes_db)+1)))}) ',
             *puzzle_hashes_db,
         )]
 
     async def get_farmer_points_and_payout_instructions(self) -> List[Tuple[uint64, bytes, bytes]]:
         accumulated: Dict[bytes32, uint64] = {}
         launcher_points: Dict[bytes32, bytes32] = {}
-        for row in await self.connection.fetch(f"SELECT points, payout_instructions, launcher_id from farmer"):
+        for row in await self.connection.fetch(f"SELECT points, payout_instructions, launcher_id from maxi_farmer"):
             points: uint64 = uint64(row[0])
             ph: bytes32 = bytes32(bytes.fromhex(row[1]))
             la: bytes32 = bytes32(bytes.fromhex(row[2]))
@@ -199,36 +199,36 @@ class PGStore(AbstractPoolStore):
     async def snapshot_farmer_points(self) -> None:
         await self.connection.execute(
             (
-                "INSERT into points_ss (launcher_id, points, timestamp, delay_time)"
-                "SELECT launcher_id, points, trunc(extract(epoch from now())), delay_time from farmer WHERE points != 0"
+                "INSERT into maxi_points_ss (launcher_id, points, timestamp, delay_time)"
+                "SELECT launcher_id, points, trunc(extract(epoch from now())), delay_time from maxi_farmer WHERE points != 0"
             )
         )
 
     async def clear_farmer_points(self) -> None:
-        await self.connection.execute(f"UPDATE farmer set points=0")
+        await self.connection.execute(f"UPDATE maxi_farmer set points=0")
 
     async def add_partial(self, launcher_id: bytes32, harvester_id: bytes32, timestamp: uint64, difficulty: uint64):
         await self.connection.execute(
-            "INSERT into partial (launcher_id, harvester_id, timestamp, difficulty) VALUES($1, $2, $3, $4)",
+            "INSERT into maxi_partial (launcher_id, harvester_id, timestamp, difficulty) VALUES($1, $2, $3, $4)",
             launcher_id.hex(), harvester_id.hex(), timestamp, difficulty,
         )
-        row = await self.connection.fetchrow(f"SELECT points from farmer where launcher_id=$1", launcher_id.hex())
+        row = await self.connection.fetchrow(f"SELECT points from maxi_farmer where launcher_id=$1", launcher_id.hex())
         points = row[0]
         await self.connection.execute(
-            f"UPDATE farmer set points=$1 where launcher_id=$2", points + difficulty, launcher_id.hex()
+            f"UPDATE maxi_farmer set points=$1 where launcher_id=$2", points + difficulty, launcher_id.hex()
         )
 
     async def get_recent_partials(self, launcher_id: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
         ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty))
                                             for timestamp, difficulty in await self.connection.fetch(
-                "SELECT timestamp, difficulty from partial WHERE launcher_id=$1 ORDER BY timestamp DESC LIMIT $2",
+                "SELECT timestamp, difficulty from maxi_partial WHERE launcher_id=$1 ORDER BY timestamp DESC LIMIT $2",
                 launcher_id.hex(), count,
             )]
         return ret
 
     async def add_payment(self, payment: PaymentRecord):
         await self.connection.execute(
-            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, txid, note) VALUES($1, $2, $3, $4, $5, $6, $7)",
+            f"INSERT into maxi_payment (launcher_id, amount, payment_type, timestamp, points, txid, note) VALUES($1, $2, $3, $4, $5, $6, $7)",
             *(
                 payment.launcher_id.hex(),
                 payment.payment_amount,
@@ -242,7 +242,7 @@ class PGStore(AbstractPoolStore):
 
     async def add_reward_record(self, reward: RewardRecord):
         await self.connection.execute(
-            f"INSERT INTO rewards_tx(launcher_id, claimable, height, coins, timestamp) VALUES($1, $2, $3, $4, $5)",
+            f"INSERT INTO maxi_rewards_tx(launcher_id, claimable, height, coins, timestamp) VALUES($1, $2, $3, $4, $5)",
             *(
                 reward.launcher_id.hex(),
                 reward.claimable,

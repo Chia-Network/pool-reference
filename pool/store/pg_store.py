@@ -22,11 +22,11 @@ class PGStore(AbstractPoolStore):
     """
     def __init__(self):
         super().__init__()
-        self.connection: Optional[asyncpg.Connection] = None
+        self.connection: Optional[asyncpg.Pool] = None
 
     async def connect(self):
         print('Connecting to the postgreSQL database...')
-        self.connection = await asyncpg.connect('postgresql://postgres@localhost/maxipool')
+        self.connection = await asyncpg.create_pool('postgresql://postgres@localhost/maxipool')
         await self.connection.execute(
             (
                 "CREATE TABLE IF NOT EXISTS maxi_farmer("

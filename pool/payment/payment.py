@@ -42,6 +42,7 @@ class Payment:
         self.constants = constants
 
         self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        self.store_payment: AbstractPoolStore = pool_store or SqlitePoolStore()
 
         self.pool_fee = pool_config["pool_fee"]
 
@@ -89,6 +90,7 @@ class Payment:
 
     async def start(self):
         await self.store.connect()
+        await self.store_payment.connect()
 
         self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
@@ -124,6 +126,7 @@ class Payment:
         self.node_rpc_client.close()
         await self.node_rpc_client.await_closed()
         await self.store.connection.close()
+        await self.store_payment.connection.close()
 
     async def get_peak_loop(self):
         """
@@ -252,7 +255,7 @@ class Payment:
                         "n/a",
                     )
                     self.log.info(f"payment record: {payment}")
-                    await self.store.add_payment(payment)
+                    await self.store_payment.add_payment(payment)
 
                 # TODO(pool): make sure you have enough to pay the blockchain fee, this will be taken out of the pool
                 # fee itself. Alternatively you can set it to 0 and wait longer

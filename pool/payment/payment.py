@@ -21,7 +21,7 @@ from chia.util.chia_logging import initialize_logging
 from chia.wallet.transaction_record import TransactionRecord
 
 from pool.store.abstract import AbstractPoolStore
-from pool.store.sqlite_store import SqlitePoolStore
+from pool.store.pg_store import PGStore
 
 from ..pay_record import PaymentRecord
 
@@ -41,7 +41,7 @@ class Payment:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        self.store: AbstractPoolStore = pool_store or PGStore()
 
         self.pool_fee = pool_config["pool_fee"]
 

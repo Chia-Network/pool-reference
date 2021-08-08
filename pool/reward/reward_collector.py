@@ -23,7 +23,7 @@ from chia.pools.pool_puzzles import (
 
 from pool.singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
 from pool.store.abstract import AbstractPoolStore
-from pool.store.sqlite_store import SqlitePoolStore
+from pool.store.pg_store import PGStore
 
 from ..reward_record import RewardRecord
 
@@ -45,7 +45,7 @@ class RewardCollector:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        self.store: AbstractPoolStore = pool_store or PGStore()
 
         # This is the wallet fingerprint and ID for the wallet spending the funds from `self.default_target_puzzle_hash`
         self.wallet_fingerprint = pool_config["wallet_fingerprint"]

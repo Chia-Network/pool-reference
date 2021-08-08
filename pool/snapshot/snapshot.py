@@ -2,21 +2,16 @@ import asyncio
 import logging
 import pathlib
 import traceback
-from math import floor
 from typing import Dict, Optional, Set, List, Tuple, Callable
 
 import os
 import yaml
-import time
 
 from chia.consensus.constants import ConsensusConstants
-from chia.util.ints import uint8, uint16, uint32, uint64
-from chia.util.default_root import DEFAULT_ROOT_PATH
-from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.chia_logging import initialize_logging
 
 from pool.store.abstract import AbstractPoolStore
-from pool.store.sqlite_store import SqlitePoolStore
+from pool.store.pg_store import PGStore
 
 
 class Snapshot:
@@ -35,7 +30,7 @@ class Snapshot:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        self.store: AbstractPoolStore = pool_store or PGStore()
 
         # Interval for taking snapshot of farmer's points
         self.snapshot_interval = pool_config["snapshot_interval"]

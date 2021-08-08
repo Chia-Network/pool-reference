@@ -9,7 +9,6 @@ from chia.util.config import load_config
 
 from .snapshot import Snapshot
 from pool.store.abstract import AbstractPoolStore
-from pool.store.pg_store import PGStore
 
 
 class SnapshotServer:
@@ -45,7 +44,7 @@ async def stop():
 
 def main():
     try:
-        asyncio.run(start_snapshot_server(pool_store=PGStore()))
+        asyncio.run(start_snapshot_server())
     except KeyboardInterrupt:
         asyncio.run(stop())
 

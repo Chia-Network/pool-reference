@@ -35,7 +35,6 @@ from .record import FarmerRecord
 from .pool import Pool
 from .store.abstract import AbstractPoolStore
 from .util import error_response, RequestMetadata
-from .store.pg_store import PGStore
 
 def allow_cors(response: web.Response) -> web.Response:
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -324,7 +323,7 @@ async def stop():
 
 def main():
     try:
-        asyncio.run(start_pool_server(pool_store=PGStore()))
+        asyncio.run(start_pool_server())
     except KeyboardInterrupt:
         asyncio.run(stop())
 

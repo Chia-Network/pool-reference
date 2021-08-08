@@ -159,6 +159,7 @@ class RewardCollector:
                 ph_to_coins: Dict[bytes32, List[CoinRecord]] = {}
                 not_buried_amounts = 0
                 for cr in coin_records:
+                    self.log.info(f"coin_record: {cr}")
                     if cr.confirmed_block_index > peak_height - self.confirmation_security_threshold:
                         not_buried_amounts += cr.coin.amount
                         continue
@@ -216,19 +217,25 @@ class RewardCollector:
                         )
 
                         if spend_bundle is None:
+                            self.log.info(f"spend_bundle is None. {spend_bundle}")
                             continue
 
                         push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
                         if push_tx_response["status"] == "SUCCESS":
+                            block_index: List[bytes32] = []
                             # TODO(pool): save transaction in records
-                            reward = RewardRecord(
-                                rec.launcher_id,
-                                claimable_amounts,
-                                self.blockchain_state["peak"].height,
-                                rec.p2_singleton_puzzle_hash,
-                                uint64(time.time())
-                            )
-                            await self.store.add_reward_record(reward)
+                            for cr in ph_to_coins[rec.p2_singleton_puzzle_hash]:
+                                if cr.confirmed_block_index not in block_index:
+                                    block_index.append(cr.confirmed_block_index)
+                                    reward = RewardRecord(
+                                        rec.launcher_id,
+                                        cr.coin.amount,
+                                        cr.confirmed_block_index,
+                                        cr.coin.puzzle_hash,
+                                        cr.timestamp
+                                    )
+                                    self.log.info(f"add reward record: {reward}")
+                                    await self.store.add_reward_record(reward)
                             self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
                         else:
                             self.log.error(f"Error submitting transaction: {push_tx_response}")

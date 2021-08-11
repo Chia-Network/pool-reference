@@ -9,7 +9,7 @@ from chia.util.config import load_config
 
 from .payment import Payment
 from pool.store.abstract import AbstractPoolStore
-from pool.store.pg_store import PGStore
+
 
 
 class PaymentServer:
@@ -45,7 +45,7 @@ async def stop():
 
 def main():
     try:
-        asyncio.run(start_reward_collector_server(pool_store=PGStore()))
+        asyncio.run(start_reward_collector_server())
     except KeyboardInterrupt:
         asyncio.run(stop())
 

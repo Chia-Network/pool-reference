@@ -46,7 +46,7 @@ from chia.pools.pool_puzzles import (
 from .difficulty_adjustment import get_new_difficulty
 from .singleton import create_absorb_transaction, get_singleton_state, get_coin_spend, get_farmed_height
 from .store.abstract import AbstractPoolStore
-from .store.sqlite_store import SqlitePoolStore
+from .store.mysql_store import MysqlPoolStore
 from .record import FarmerRecord
 from .util import error_dict, RequestMetadata
 
@@ -77,7 +77,7 @@ class Pool:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        self.store: AbstractPoolStore = pool_store or MysqlPoolStore()
 
         self.pool_fee = pool_config["pool_fee"]
 

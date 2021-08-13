@@ -25,6 +25,12 @@ max_additions_per_transaction: 400
 number_of_partials_target: 300
 time_target: 86400
 relative_lock_height: 32
+# Automatically delete rows in the partial table, default is false
+auto_delete_partial: true
+# Automatic deletion of records in partial, run interval (seconds)
+auto_delete_partial_interval: 600
+# How long to keep the records in the partial table (seconds)
+partial_retetion_time: 86400
 logging:
   log_path: /var/log/chia
   log_filename: pool-server.log

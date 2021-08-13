@@ -168,6 +168,11 @@ class SqlitePoolStore(AbstractPoolStore):
         await cursor.close()
         await self.connection.commit()
 
+    async def auto_delete_partial(self,retetion_time: uint64) -> None:
+        cursor = await self.connection.execute(f"DELETE from partial where timestamp <?", (retetion_time,))
+        await cursor.close()
+        await self.connection.commit()
+
     async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
         cursor = await self.connection.execute(
             "INSERT into partial VALUES(?, ?, ?)",

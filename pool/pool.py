@@ -407,6 +407,7 @@ class Pool:
 
                 if total_amount_claimed < calculate_pool_reward(uint32(1)):  # 1.75 XCH
                     self.log.info(f"Do not have enough funds to distribute: {total_amount_claimed}, skipping payout")
+                    await asyncio.sleep(120)
                     continue
 
                 self.log.info(f"Total amount claimed: {total_amount_claimed / (10 ** 12)}")

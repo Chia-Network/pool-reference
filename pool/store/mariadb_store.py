@@ -203,10 +203,10 @@ class MariadbPoolStore(AbstractPoolStore):
                 else:
                     accumulated[ph] = points
 
-                ret: List[Tuple[uint64, bytes32]] = []
-                for ph, total_points in accumulated.items():
-                    ret.append((total_points, ph))
-                return ret
+            ret: List[Tuple[uint64, bytes32]] = []
+            for ph, total_points in accumulated.items():
+                ret.append((total_points, ph))
+            return ret
 
     async def clear_farmer_points(self) -> None:
         with (await self.pool) as connection:

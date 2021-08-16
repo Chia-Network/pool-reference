@@ -4,7 +4,7 @@ from typing import Optional, Set, List, Tuple
 
 from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.types.coin_solution import CoinSolution
+from chia.types.coin_spend import CoinSpend
 from chia.util.ints import uint64
 
 from ..record import FarmerRecord
@@ -18,6 +18,7 @@ class AbstractPoolStore(ABC):
 
     def __init__(self):
         self.lock = asyncio.Lock()
+        self.connection = None
 
     @abstractmethod
     async def connect(self):
@@ -39,7 +40,7 @@ class AbstractPoolStore(ABC):
     async def update_singleton(
         self,
         launcher_id: bytes32,
-        singleton_tip: CoinSolution,
+        singleton_tip: CoinSpend,
         singleton_tip_state: PoolState,
         is_pool_member: bool,
     ):

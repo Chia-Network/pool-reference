@@ -49,7 +49,6 @@ from .store.abstract import AbstractPoolStore
 from .store.sqlite_store import SqlitePoolStore
 from .record import FarmerRecord
 from .util import error_dict, RequestMetadata
-from pool.store.pg_store import PGStore
 
 
 class Pool:
@@ -181,7 +180,7 @@ class Pool:
 
         self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
-            self_hostname, uint16(self.node_rpc_port), DEFAULT_ROOT_PATH, self.config
+            self.config["self_hostname"], uint16(self.node_rpc_port), DEFAULT_ROOT_PATH, self.config
         )
         self.wallet_rpc_client = await WalletRpcClient.create(
             self.config["self_hostname"], uint16(self.wallet_rpc_port), DEFAULT_ROOT_PATH, self.config
@@ -552,7 +551,8 @@ class Pool:
                 )
 
                 if farmer_record.is_pool_member:
-                    await self.store.add_partial(partial.payload.launcher_id, partial.payload.harvester_id, uint64(int(time.time())), points_received)
+                    await self.store.add_partial(partial.payload.launcher_id, partial.payload.harvester_id,
+                                                 uint64(int(time.time())), points_received)
                     self.log.info(
                         f"Farmer {farmer_record.launcher_id}/{partial.payload.harvester_id} updated points to: "
                         f"{farmer_record.points + points_received}"

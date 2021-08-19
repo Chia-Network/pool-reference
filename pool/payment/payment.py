@@ -120,20 +120,20 @@ class Payment:
         res = await self.wallet_rpc_client.get_wallet_balance(self.wallet_id)
         self.log.info(f"Obtaining balance: {res}")
 
+        self.collect_pool_rewards_loop_task = asyncio.create_task(self.collect_pool_rewards_loop())
         self.create_payment_loop_task = asyncio.create_task(self.create_payment_loop())
         self.submit_payment_loop_task = asyncio.create_task(self.submit_payment_loop())
-        self.collect_pool_rewards_loop_task = asyncio.create_task(self.collect_pool_rewards_loop())
         self.get_peak_loop_task = asyncio.create_task(self.get_peak_loop())
 
         self.pending_payments = asyncio.Queue()
 
     async def stop(self):
+        if self.collect_pool_rewards_loop_task is not None:
+            self.collect_pool_rewards_loop_task.cancel()
         if self.create_payment_loop_task is not None:
             self.create_payment_loop_task.cancel()
         if self.submit_payment_loop_task is not None:
             self.submit_payment_loop_task.cancel()
-        if self.collect_pool_rewards_loop_task is not None:
-            self.collect_pool_rewards_loop_task.cancel()
         if self.get_peak_loop_task is not None:
             self.get_peak_loop_task.cancel()
 
@@ -158,6 +158,126 @@ class Payment:
             except Exception as e:
                 self.log.error(f"Unexpected error in get_peak_loop: {e}")
                 await asyncio.sleep(30)
+
+    async def collect_pool_rewards_loop(self):
+        """
+        Iterates through the blockchain, looking for pool rewards, and claims them, creating a transaction to the
+        pool's puzzle_hash.
+        """
+
+        while True:
+            try:
+                if not self.blockchain_state["sync"]["synced"]:
+                    await asyncio.sleep(60)
+                    continue
+
+                self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
+
+                scan_phs: List[bytes32] = list(self.scan_p2_singleton_puzzle_hashes)
+                peak_height = self.blockchain_state["peak"].height
+
+                # Only get puzzle hashes with a certain number of confirmations or more, to avoid reorg issues
+                coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hashes(
+                    scan_phs,
+                    include_spent_coins=False,
+                    start_height=self.scan_start_height,
+                )
+                self.log.info(
+                    f"Scanning for block rewards from {self.scan_start_height} to {peak_height}. "
+                    f"Found: {len(coin_records)}"
+                )
+                ph_to_amounts: Dict[bytes32, int] = {}
+                ph_to_coins: Dict[bytes32, List[CoinRecord]] = {}
+                not_buried_amounts = 0
+                for cr in coin_records:
+                    self.log.info(f"coin_record: {cr}")
+                    if cr.confirmed_block_index > peak_height - self.confirmation_security_threshold:
+                        not_buried_amounts += cr.coin.amount
+                        continue
+                    if cr.coin.puzzle_hash not in ph_to_amounts:
+                        ph_to_amounts[cr.coin.puzzle_hash] = 0
+                        ph_to_coins[cr.coin.puzzle_hash] = []
+                    ph_to_amounts[cr.coin.puzzle_hash] += cr.coin.amount
+                    ph_to_coins[cr.coin.puzzle_hash].append(cr)
+
+                # For each p2sph, get the FarmerRecords
+                farmer_records = await self.store.get_farmer_records_for_p2_singleton_phs(
+                    set([ph for ph in ph_to_amounts.keys()])
+                )
+
+                # For each singleton, create, submit, and save a claim transaction
+                claimable_amounts = 0
+                not_claimable_amounts = 0
+                for rec in farmer_records:
+                    if rec.is_pool_member:
+                        claimable_amounts += ph_to_amounts[rec.p2_singleton_puzzle_hash]
+                    else:
+                        not_claimable_amounts += ph_to_amounts[rec.p2_singleton_puzzle_hash]
+
+                if len(coin_records) > 0:
+                    self.log.info(f"Claimable amount: {claimable_amounts / (10 ** 12)}")
+                    self.log.info(f"Not claimable amount: {not_claimable_amounts / (10 ** 12)}")
+                    self.log.info(f"Not buried amounts: {not_buried_amounts / (10 ** 12)}")
+
+                for rec in farmer_records:
+                    if rec.is_pool_member:
+                        singleton_tip: Optional[Coin] = get_most_recent_singleton_coin_from_coin_spend(
+                            rec.singleton_tip
+                        )
+                        if singleton_tip is None:
+                            continue
+
+                        singleton_coin_record: Optional[
+                            CoinRecord
+                        ] = await self.node_rpc_client.get_coin_record_by_name(singleton_tip.name())
+                        if singleton_coin_record is None:
+                            continue
+                        if singleton_coin_record.spent:
+                            self.log.warning(
+                                f"Singleton coin {singleton_coin_record.coin.name()} is spent, will not "
+                                f"claim rewards"
+                            )
+                            continue
+
+                        spend_bundle = await create_absorb_transaction(
+                            self.node_rpc_client,
+                            rec,
+                            self.blockchain_state["peak"].height,
+                            ph_to_coins[rec.p2_singleton_puzzle_hash],
+                            self.constants.GENESIS_CHALLENGE,
+                        )
+
+                        if spend_bundle is None:
+                            self.log.info(f"spend_bundle is None. {spend_bundle}")
+                            continue
+
+                        push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
+                        if push_tx_response["status"] == "SUCCESS":
+                            block_index: List[bytes32] = []
+                            # Saving transaction in records.
+                            for cr in ph_to_coins[rec.p2_singleton_puzzle_hash]:
+                                if cr.confirmed_block_index not in block_index:
+                                    block_index.append(cr.confirmed_block_index)
+                                    reward = RewardRecord(
+                                        rec.launcher_id,
+                                        cr.coin.amount,
+                                        cr.confirmed_block_index,
+                                        cr.coin.puzzle_hash,
+                                        cr.timestamp
+                                    )
+                                    self.log.info(f"add reward record: {reward}")
+                                    await self.store.add_reward_record(reward)
+                            self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
+                        else:
+                            self.log.error(f"Error submitting transaction: {push_tx_response}")
+                await asyncio.sleep(self.collect_pool_rewards_interval)
+            except asyncio.CancelledError:
+                self.log.info("Cancelled collect_pool_rewards_loop, closing")
+                return
+            except Exception as e:
+                error_stack = traceback.format_exc()
+                self.log.error(f"Unexpected error in collect_pool_rewards_loop: {e} {error_stack}")
+                await asyncio.sleep(self.collect_pool_rewards_interval)
 
     async def create_payment_loop(self):
         """
@@ -193,8 +313,8 @@ class Payment:
                 amount_to_distribute = total_amount_claimed - pool_coin_amount
 
                 self.log.info(f"Total amount claimed: {total_amount_claimed / (10 ** 12)}")
-                self.log.info(f"Pool coin amount (includes blockchain fee) {pool_coin_amount  / (10 ** 12)}")
-                self.log.info(f"Total amount to distribute: {amount_to_distribute  / (10 ** 12)}")
+                self.log.info(f"Pool coin amount (includes blockchain fee) {pool_coin_amount / (10 ** 12)}")
+                self.log.info(f"Total amount to distribute: {amount_to_distribute / (10 ** 12)}")
 
                 async with self.store.lock:
                     # Get the points of each farmer, as well as payout instructions. Here a chia address is used,
@@ -258,21 +378,6 @@ class Payment:
 
                 self.log.info(f"Submitting a payment: {payment_targets}")
 
-                # add payment record for each launcher
-                for payment_target in payment_targets:
-                    self.log.info(f"payment_target : {payment_target}")
-                    payment = PaymentRecord(
-                        bytes32(payment_target["launcher_id"]),
-                        uint64(payment_target["amount"]),
-                        uint64(payment_target["points"]),
-                        uint64(time.time()),
-                        "XCH",
-                        "n/a",
-                        "n/a",
-                    )
-                    self.log.info(f"payment record: {payment}")
-                    await self.store.add_payment(payment)
-
                 # TODO(pool): make sure you have enough to pay the blockchain fee, this will be taken out of the pool
                 # fee itself. Alternatively you can set it to 0 and wait longer
                 # blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
@@ -290,8 +395,8 @@ class Payment:
                 self.log.info(f"Transaction: {transaction}")
 
                 while (
-                    not transaction.confirmed
-                    or not (peak_height - transaction.confirmed_at_height) > self.confirmation_security_threshold
+                        not transaction.confirmed
+                        or not (peak_height - transaction.confirmed_at_height) > self.confirmation_security_threshold
                 ):
                     transaction = await self.wallet_rpc_client.get_transaction(self.wallet_id, transaction.name)
                     peak_height = self.blockchain_state["peak"].height
@@ -304,7 +409,20 @@ class Payment:
                         self.log.info(f"Confirmations: {peak_height - transaction.confirmed_at_height}")
                     await asyncio.sleep(10)
 
-                # TODO(pool): persist in DB
+                # add payment record for each launcher
+                for payment_target in payment_targets:
+                    self.log.info(f"payment_target : {payment_target}")
+                    payment = PaymentRecord(
+                        bytes32(payment_target["launcher_id"]),
+                        uint64(payment_target["amount"]),
+                        uint64(payment_target["points"]),
+                        uint64(time.time()),
+                        "XCH",
+                        bytes32(transaction.name),
+                        uint32(transaction.confirmed_at_height),
+                    )
+                    self.log.info(f"payment record: {payment}")
+                    await self.store.add_payment(payment)
                 self.log.info(f"Successfully confirmed payments {payment_targets}")
 
             except asyncio.CancelledError:
@@ -315,123 +433,3 @@ class Payment:
                 error_stack = traceback.format_exc()
                 self.log.error(f"Unexpected error in submit_payment_loop: {e} {error_stack}")
                 await asyncio.sleep(60)
-
-    async def collect_pool_rewards_loop(self):
-        """
-        Iterates through the blockchain, looking for pool rewards, and claims them, creating a transaction to the
-        pool's puzzle_hash.
-        """
-
-        while True:
-            try:
-                if not self.blockchain_state["sync"]["synced"]:
-                    await asyncio.sleep(60)
-                    continue
-
-                self.scan_p2_singleton_puzzle_hashes = await self.store.get_pay_to_singleton_phs()
-
-                scan_phs: List[bytes32] = list(self.scan_p2_singleton_puzzle_hashes)
-                peak_height = self.blockchain_state["peak"].height
-
-                # Only get puzzle hashes with a certain number of confirmations or more, to avoid reorg issues
-                coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hashes(
-                    scan_phs,
-                    include_spent_coins=False,
-                    start_height=self.scan_start_height,
-                )
-                self.log.info(
-                    f"Scanning for block rewards from {self.scan_start_height} to {peak_height}. "
-                    f"Found: {len(coin_records)}"
-                )
-                ph_to_amounts: Dict[bytes32, int] = {}
-                ph_to_coins: Dict[bytes32, List[CoinRecord]] = {}
-                not_buried_amounts = 0
-                for cr in coin_records:
-                    self.log.info(f"coin_record: {cr}")
-                    if cr.confirmed_block_index > peak_height - self.confirmation_security_threshold:
-                        not_buried_amounts += cr.coin.amount
-                        continue
-                    if cr.coin.puzzle_hash not in ph_to_amounts:
-                        ph_to_amounts[cr.coin.puzzle_hash] = 0
-                        ph_to_coins[cr.coin.puzzle_hash] = []
-                    ph_to_amounts[cr.coin.puzzle_hash] += cr.coin.amount
-                    ph_to_coins[cr.coin.puzzle_hash].append(cr)
-
-                # For each p2sph, get the FarmerRecords
-                farmer_records = await self.store.get_farmer_records_for_p2_singleton_phs(
-                    set([ph for ph in ph_to_amounts.keys()])
-                )
-
-                # For each singleton, create, submit, and save a claim transaction
-                claimable_amounts = 0
-                not_claimable_amounts = 0
-                for rec in farmer_records:
-                    if rec.is_pool_member:
-                        claimable_amounts += ph_to_amounts[rec.p2_singleton_puzzle_hash]
-                    else:
-                        not_claimable_amounts += ph_to_amounts[rec.p2_singleton_puzzle_hash]
-
-                if len(coin_records) > 0:
-                    self.log.info(f"Claimable amount: {claimable_amounts / (10**12)}")
-                    self.log.info(f"Not claimable amount: {not_claimable_amounts / (10**12)}")
-                    self.log.info(f"Not buried amounts: {not_buried_amounts / (10**12)}")
-
-                for rec in farmer_records:
-                    if rec.is_pool_member:
-                        singleton_tip: Optional[Coin] = get_most_recent_singleton_coin_from_coin_spend(
-                            rec.singleton_tip
-                        )
-                        if singleton_tip is None:
-                            continue
-
-                        singleton_coin_record: Optional[
-                            CoinRecord
-                        ] = await self.node_rpc_client.get_coin_record_by_name(singleton_tip.name())
-                        if singleton_coin_record is None:
-                            continue
-                        if singleton_coin_record.spent:
-                            self.log.warning(
-                                f"Singleton coin {singleton_coin_record.coin.name()} is spent, will not "
-                                f"claim rewards"
-                            )
-                            continue
-
-                        spend_bundle = await create_absorb_transaction(
-                            self.node_rpc_client,
-                            rec,
-                            self.blockchain_state["peak"].height,
-                            ph_to_coins[rec.p2_singleton_puzzle_hash],
-                            self.constants.GENESIS_CHALLENGE,
-                        )
-
-                        if spend_bundle is None:
-                            self.log.info(f"spend_bundle is None. {spend_bundle}")
-                            continue
-
-                        push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
-                        if push_tx_response["status"] == "SUCCESS":
-                            block_index: List[bytes32] = []
-                            # TODO(pool): save transaction in records
-                            for cr in ph_to_coins[rec.p2_singleton_puzzle_hash]:
-                                if cr.confirmed_block_index not in block_index:
-                                    block_index.append(cr.confirmed_block_index)
-                                    reward = RewardRecord(
-                                        rec.launcher_id,
-                                        cr.coin.amount,
-                                        cr.confirmed_block_index,
-                                        cr.coin.puzzle_hash,
-                                        cr.timestamp
-                                    )
-                                    self.log.info(f"add reward record: {reward}")
-                                    await self.store.add_reward_record(reward)
-                            self.log.info(f"Submitted transaction successfully: {spend_bundle.name().hex()}")
-                        else:
-                            self.log.error(f"Error submitting transaction: {push_tx_response}")
-                await asyncio.sleep(self.collect_pool_rewards_interval)
-            except asyncio.CancelledError:
-                self.log.info("Cancelled collect_pool_rewards_loop, closing")
-                return
-            except Exception as e:
-                error_stack = traceback.format_exc()
-                self.log.error(f"Unexpected error in collect_pool_rewards_loop: {e} {error_stack}")
-                await asyncio.sleep(self.collect_pool_rewards_interval)

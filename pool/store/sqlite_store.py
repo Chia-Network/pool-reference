@@ -66,7 +66,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 "timestamp bigint,"
                 "points bigint,"
                 "transaction_id text,"
-                "note text)"
+                "block_confirmed bigint)"
             )
         )
 
@@ -258,8 +258,8 @@ class SqlitePoolStore(AbstractPoolStore):
 
     async def add_payment(self, payment: PaymentRecord):
         cursor = await self.connection.execute(
-            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, transaction_id, note)"
-            f" VALUES(?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, transaction_id,"
+            f" block_confirmed) VALUES(?, ?, ?, ?, ?, ?, ?)",
             (
                 payment.launcher_id.hex(),
                 payment.payment_amount,
@@ -267,7 +267,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 payment.timestamp,
                 payment.points,
                 payment.transaction_id,
-                payment.note
+                payment.block_confirmed
             ),
         )
         await cursor.close()

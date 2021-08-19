@@ -208,11 +208,13 @@ class Payment:
                         self.log.info(f"Paying out {mojo_per_point} mojo / point")
 
                         additions_sub_list: List[Dict] = [
-                            {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount, "launcher_id": self.default_target_puzzle_hash, "points": 0}
+                            {"puzzle_hash": self.pool_fee_puzzle_hash, "amount": pool_coin_amount,
+                             "launcher_id": self.default_target_puzzle_hash, "points": 0}
                         ]
                         for points, ph, launcher in points_and_ph:
                             if points > 0:
-                                additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point, "launcher_id": launcher, "points": points})
+                                additions_sub_list.append({"puzzle_hash": ph, "amount": points * mojo_per_point,
+                                                           "launcher_id": launcher, "points": points})
 
                             if len(additions_sub_list) == self.max_additions_per_transaction:
                                 await self.pending_payments.put(additions_sub_list.copy())

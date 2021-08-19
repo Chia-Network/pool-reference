@@ -15,19 +15,19 @@ class PaymentServer:
     def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
 
         self.log = logging.getLogger(__name__)
-        self.reward_collector = Payment(config, constants, pool_store)
+        self.payment = Payment(config, constants, pool_store)
 
     async def start(self):
-        await self.reward_collector.start()
+        await self.payment.start()
 
     async def stop(self):
-        await self.reward_collector.stop()
+        await self.payment.stop()
 
 
 server: Optional[PaymentServer] = None
 
 
-async def start_reward_collector_server(pool_store: Optional[AbstractPoolStore] = None):
+async def start_payment_server(pool_store: Optional[AbstractPoolStore] = None):
     global server
     config = load_config(DEFAULT_ROOT_PATH, "config.yaml")
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
@@ -44,7 +44,7 @@ async def stop():
 
 def main():
     try:
-        asyncio.run(start_reward_collector_server())
+        asyncio.run(start_payment_server())
     except KeyboardInterrupt:
         asyncio.run(stop())
 

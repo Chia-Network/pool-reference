@@ -13,5 +13,5 @@ class PaymentRecord(Streamable):
     points: uint64  # The points of the farmer during the payment
     timestamp: uint64  # The timestamp of the payment
     payment_type: str  # The type of the payment coin:  XCH, MAXI, WXCH etc
-    txid: str  # The payment transaction id/hash
+    transaction_id: str  # The payment transaction id/hash
     note: str  # Additional payment note

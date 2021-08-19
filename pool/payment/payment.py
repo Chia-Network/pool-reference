@@ -26,7 +26,7 @@ from chia.pools.pool_puzzles import (
 
 from pool.singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
 from pool.store.abstract import AbstractPoolStore
-from pool.store.pg_store import PGStore
+from pool.store.sqlite_store import SqlitePoolStore
 
 from ..pay_record import PaymentRecord
 from ..reward_record import RewardRecord
@@ -49,7 +49,7 @@ class Payment:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or PGStore()
+        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
 
         self.pool_fee = pool_config["pool_fee"]
 

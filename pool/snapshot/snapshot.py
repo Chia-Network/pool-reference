@@ -11,7 +11,7 @@ from chia.consensus.constants import ConsensusConstants
 from chia.util.chia_logging import initialize_logging
 
 from pool.store.abstract import AbstractPoolStore
-from pool.store.pg_store import PGStore
+from pool.store.sqlite_store import SqlitePoolStore
 
 
 class Snapshot:
@@ -30,7 +30,7 @@ class Snapshot:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or PGStore()
+        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
 
         # Interval for taking snapshot of farmer's points
         self.snapshot_interval = pool_config["snapshot_interval"]
@@ -55,9 +55,10 @@ class Snapshot:
         """
         while True:
             try:
-                self.log.info(f"Create snapshot of the farmers")
+                self.log.info(f"Creating snapshot of the farmers")
                 # keep a snapshot of the points collected by the farmer
                 await self.store.snapshot_farmer_points()
+                self.log.info(f"Snapshot Completed")
                 await asyncio.sleep(self.snapshot_interval)
 
             except asyncio.CancelledError:

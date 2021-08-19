@@ -89,11 +89,11 @@ class SqlitePoolStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "CREATE TABLE IF NOT EXISTS rewards_tx("
-                "launcher_id text,  /* farmer*/"
-                "claimable bigint,  /* block reward*/"
-                "height bigint,     /* block height of the reward*/"
-                "coins text,        /* coin hash*/"
-                "timestamp bigint   /* timestamp of the record */)"
+                "launcher_id text,"  # farmer
+                "claimable bigint,"  # block reward
+                "block_height bigint,"  # block height of the reward
+                "coins_hash text,"  # coins hash
+                "timestamp bigint)"  # records timestamp
             )
         )
         await self.connection.execute("CREATE INDEX IF NOT EXISTS re_launcher_id_index on rewards_tx(launcher_id)")
@@ -275,7 +275,7 @@ class SqlitePoolStore(AbstractPoolStore):
 
     async def add_reward_record(self, reward: RewardRecord):
         cursor = await self.connection.execute(
-            f"INSERT INTO rewards_tx(launcher_id, claimable, height, coins, timestamp) VALUES(?, ?, ?, ?, ?)",
+            f"INSERT INTO rewards_tx(launcher_id, claimable, block_height, coins_hash, timestamp) VALUES(?, ?, ?, ?, ?)",
             (
                 reward.launcher_id.hex(),
                 reward.claimable,

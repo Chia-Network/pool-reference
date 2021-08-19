@@ -44,7 +44,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 " difficulty bigint,"
                 " payout_instructions text,"
                 " is_pool_member tinyint,"
-                " create_at bigint)"
+                " created_at bigint)"
             )
         )
 
@@ -65,7 +65,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 "payment_type text,"
                 "timestamp bigint,"
                 "points bigint,"
-                "txid text,"
+                "transaction_id text,"
                 "note text)"
             )
         )
@@ -75,14 +75,15 @@ class SqlitePoolStore(AbstractPoolStore):
         # snapshot table to keep track of farmer's points
         await self.connection.execute(
             (
-                "CREATE TABLE IF NOT EXISTS points_ss("
+                "CREATE TABLE IF NOT EXISTS points_snapshot("
                 "launcher_id text,"
                 "points bigint,"
                 "delay_time bigint,"
                 "timestamp bigint)"
             )
         )
-        await self.connection.execute("CREATE INDEX IF NOT EXISTS ss_launcher_id_index on points_ss(launcher_id)")
+        await self.connection.execute("CREATE INDEX IF NOT EXISTS snapshot_launcher_id_index on "
+                                      "points_snapshot(launcher_id)")
 
         # create rewards tx table
         await self.connection.execute(
@@ -131,7 +132,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 farmer_record.difficulty,
                 farmer_record.payout_instructions,
                 int(farmer_record.is_pool_member),
-                farmer_record.create_at,
+                farmer_record.created_at,
             ),
         )
         await cursor.close()
@@ -219,9 +220,9 @@ class SqlitePoolStore(AbstractPoolStore):
     async def snapshot_farmer_points(self) -> None:
         await self.connection.execute(
             (
-                "INSERT into points_ss(launcher_id, points, timestamp, delay_time)"
+                "INSERT into points_snapshot(launcher_id, points, timestamp, delay_time)"
                 "SELECT launcher_id, points, strftime('%s', 'now'), delay_time from farmer "
-                "WHERE points != 0"
+                "WHERE points > 0"
             )
         )
 
@@ -257,7 +258,7 @@ class SqlitePoolStore(AbstractPoolStore):
 
     async def add_payment(self, payment: PaymentRecord):
         cursor = await self.connection.execute(
-            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, txid, note)"
+            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, transaction_id, note)"
             f" VALUES(?, ?, ?, ?, ?, ?, ?)",
             (
                 payment.launcher_id.hex(),
@@ -265,7 +266,7 @@ class SqlitePoolStore(AbstractPoolStore):
                 payment.payment_type,
                 payment.timestamp,
                 payment.points,
-                payment.txid,
+                payment.transaction_id,
                 payment.note
             ),
         )

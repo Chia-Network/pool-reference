@@ -12,6 +12,7 @@ from ..util import RequestMetadata
 from ..pay_record import PaymentRecord
 from ..reward_record import RewardRecord
 
+
 class AbstractPoolStore(ABC):
     """
     Base class for asyncio-related pool stores.

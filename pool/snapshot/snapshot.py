@@ -35,7 +35,7 @@ class Snapshot:
         # Interval for taking snapshot of farmer's points
         self.snapshot_interval = pool_config["snapshot_interval"]
 
-        self.create_payment_loop_task: Optional[asyncio.Task] = None
+        self.create_snapshot_loop_task: Optional[asyncio.Task] = None
 
     async def start(self):
         await self.store.connect()
@@ -43,7 +43,7 @@ class Snapshot:
         self.create_snapshot_loop_task = asyncio.create_task(self.create_snapshot_loop())
 
     async def stop(self):
-        if self.create_snapstho_loop_task is not None:
+        if self.create_snapshot_loop_task is not None:
             self.create_snapshot_loop_task.cancel()
 
         await self.store.connection.close()

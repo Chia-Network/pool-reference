@@ -4,6 +4,7 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.ints import uint64
 from chia.util.streamable import streamable, Streamable
 
+
 @dataclass(frozen=True)
 @streamable
 class RewardRecord(Streamable):

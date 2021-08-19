@@ -11,7 +11,6 @@ from .payment import Payment
 from pool.store.abstract import AbstractPoolStore
 
 
-
 class PaymentServer:
     def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
 

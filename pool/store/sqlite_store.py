@@ -11,8 +11,10 @@ from chia.util.ints import uint64
 from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
 from ..util import RequestMetadata
+
 from ..pay_record import PaymentRecord
 from ..reward_record import RewardRecord
+
 
 class SqlitePoolStore(AbstractPoolStore):
     """

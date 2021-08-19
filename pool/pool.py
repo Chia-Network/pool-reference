@@ -51,6 +51,7 @@ from .record import FarmerRecord
 from .util import error_dict, RequestMetadata
 from pool.store.pg_store import PGStore
 
+
 class Pool:
     def __init__(
         self,
@@ -77,7 +78,7 @@ class Pool:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or PGStore()
+        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
 
         self.pool_fee = pool_config["pool_fee"]
 

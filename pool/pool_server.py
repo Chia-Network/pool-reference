@@ -36,6 +36,7 @@ from .pool import Pool
 from .store.abstract import AbstractPoolStore
 from .util import error_response, RequestMetadata
 
+
 def allow_cors(response: web.Response) -> web.Response:
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
@@ -97,7 +98,8 @@ class PoolServer:
 
         return inner
 
-    async def index(self, _) -> web.Response:
+    @staticmethod
+    async def index() -> web.Response:
         return web.Response(text="Chia reference pool")
 
     async def get_pool_info(self, _) -> web.Response:
@@ -152,7 +154,8 @@ class PoolServer:
         self.pool.log.info(f"get_farmer response {response.to_json_dict()}, " f"launcher_id: {launcher_id.hex()}")
         return obj_to_response(response)
 
-    def post_metadata_from_request(self, request_obj):
+    @staticmethod
+    def post_metadata_from_request(request_obj):
         return RequestMetadata(
             url=str(request_obj.url),
             scheme=request_obj.scheme,

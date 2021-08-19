@@ -225,7 +225,7 @@ class Payment:
                             self.log.info(f"Will make payments: {additions_sub_list}")
                             await self.pending_payments.put(additions_sub_list.copy())
 
-                        # keep a snapshot of the points collected by the farmer
+                        # create a snapshot of the points collected by all of the farmers.
                         await self.store.snapshot_farmer_points()
 
                         # Subtract the points from each farmer

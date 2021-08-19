@@ -198,23 +198,22 @@ class SqlitePoolStore(AbstractPoolStore):
         cursor = await self.connection.execute(f"SELECT points, payout_instructions, launcher_id from farmer")
         rows = await cursor.fetchall()
         accumulated: Dict[bytes32, uint64] = {}
-        launcher_points: Dict[bytes32, bytes32] = {}
+        launcher_id_list: List[bytes32] = []
+        i: int = 0
         for row in rows:
             points: uint64 = uint64(row[0])
             ph: bytes32 = bytes32(bytes.fromhex(row[1]))
-            la: bytes32 = bytes32(bytes.fromhex(row[2]))
+            l_id: bytes32 = bytes32(bytes.fromhex(row[2]))
             if ph in accumulated:
                 accumulated[ph] += points
             else:
                 accumulated[ph] = points
-                # FIXME: only the first launcher id is recorded
-                # If there are multiple launcher id using the same payout_instructions
-                # It will cause confusion, as only one launcher seems got paid
-                launcher_points[ph] = la
+                launcher_id_list.append(l_id)
 
-        ret: List[Tuple[uint64, bytes32]] = []
+        ret: List[Tuple[uint64, bytes32, bytes32]] = []
         for ph, total_points in accumulated.items():
-            ret.append((total_points, ph, launcher_points[ph]))
+            ret.append((total_points, ph, launcher_id_list[i]))
+            i = i + 1
         return ret
 
     async def snapshot_farmer_points(self) -> None:
@@ -227,6 +226,7 @@ class SqlitePoolStore(AbstractPoolStore):
         )
 
     async def clear_farmer_points(self) -> None:
+        # noinspection SqlWithoutWhere
         cursor = await self.connection.execute(f"UPDATE farmer set points=0")
         await cursor.close()
         await self.connection.commit()
@@ -275,7 +275,8 @@ class SqlitePoolStore(AbstractPoolStore):
 
     async def add_reward_record(self, reward: RewardRecord):
         cursor = await self.connection.execute(
-            f"INSERT INTO rewards_tx(launcher_id, claimable, block_height, coins_hash, timestamp) VALUES(?, ?, ?, ?, ?)",
+            f"INSERT INTO rewards_tx(launcher_id, claimable, block_height, coins_hash, timestamp) "
+            f"VALUES(?, ?, ?, ?, ?)",
             (
                 reward.launcher_id.hex(),
                 reward.claimable,

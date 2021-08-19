@@ -99,7 +99,7 @@ class PoolServer:
         return inner
 
     @staticmethod
-    async def index() -> web.Response:
+    async def index(_) -> web.Response:
         return web.Response(text="Chia reference pool")
 
     async def get_pool_info(self, _) -> web.Response:

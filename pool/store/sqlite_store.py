@@ -49,7 +49,8 @@ class SqlitePoolStore(AbstractPoolStore):
         )
 
         await self.connection.execute(
-            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, harvester_id text, timestamp bigint, difficulty bigint)"
+            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, harvester_id text, timestamp bigint, "
+            "difficulty bigint)"
         )
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
@@ -97,7 +98,6 @@ class SqlitePoolStore(AbstractPoolStore):
         await self.connection.execute("CREATE INDEX IF NOT EXISTS re_launcher_id_index on rewards_tx(launcher_id)")
 
         await self.connection.commit()
-
 
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:
@@ -156,11 +156,11 @@ class SqlitePoolStore(AbstractPoolStore):
         await self.connection.commit()
 
     async def update_singleton(
-        self,
-        launcher_id: bytes32,
-        singleton_tip: CoinSpend,
-        singleton_tip_state: PoolState,
-        is_pool_member: bool,
+            self,
+            launcher_id: bytes32,
+            singleton_tip: CoinSpend,
+            singleton_tip_state: PoolState,
+            is_pool_member: bool,
     ):
         if is_pool_member:
             entry = (bytes(singleton_tip), bytes(singleton_tip_state), 1, launcher_id.hex())
@@ -206,9 +206,9 @@ class SqlitePoolStore(AbstractPoolStore):
                 accumulated[ph] += points
             else:
                 accumulated[ph] = points
-            # FIXME: only the first launcher id is recorded
-            # If there are multiple launcher id using the same payout_instructions
-            # It will cause confusion, as only one launcher seems got paid
+                # FIXME: only the first launcher id is recorded
+                # If there are multiple launcher id using the same payout_instructions
+                # It will cause confusion, as only one launcher seems got paid
                 launcher_points[ph] = la
 
         ret: List[Tuple[uint64, bytes32]] = []
@@ -220,7 +220,7 @@ class SqlitePoolStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "INSERT into points_ss(launcher_id, points, timestamp, delay_time)"
-                "SELECT launcher_id, points, strftime('%s', 'now'), delay_time from farmer"
+                "SELECT launcher_id, points, strftime('%s', 'now'), delay_time from farmer "
                 "WHERE points != 0"
             )
         )
@@ -257,16 +257,17 @@ class SqlitePoolStore(AbstractPoolStore):
 
     async def add_payment(self, payment: PaymentRecord):
         cursor = await self.connection.execute(
-            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, txid, note) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT into payment (launcher_id, amount, payment_type, timestamp, points, txid, note)"
+            f" VALUES(?, ?, ?, ?, ?, ?, ?)",
             (
-		payment.launcher_id.hex(),
-		payment.payment_amount,
-		payment.payment_type,
-		payment.timestamp,
-		payment.points,
-		payment.txid,
-		payment.note
-	    ),
+                payment.launcher_id.hex(),
+                payment.payment_amount,
+                payment.payment_type,
+                payment.timestamp,
+                payment.points,
+                payment.txid,
+                payment.note
+            ),
         )
         await cursor.close()
         await self.connection.commit()

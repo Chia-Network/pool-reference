@@ -16,7 +16,7 @@ from ..reward_record import RewardRecord
 
 class PGStore(AbstractPoolStore):
     """
-    Pool store based on SQLite.
+    Pool store based on PostgreSQL.
     """
     def __init__(self):
         super().__init__()
@@ -39,12 +39,13 @@ class PGStore(AbstractPoolStore):
                 " difficulty bigint,"
                 " payout_instructions text,"
                 " is_pool_member smallint,"
-                " create_at bigint)"
+                " created_at bigint)"
             )
         )
 
         await self.connection.execute(
-            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, harvester_id text, timestamp bigint, difficulty bigint)"
+            "CREATE TABLE IF NOT EXISTS partial(launcher_id text, harvester_id text, timestamp bigint,"
+            " difficulty bigint)"
         )
 
         await self.connection.execute("CREATE INDEX IF NOT EXISTS scan_ph on farmer(p2_singleton_puzzle_hash)")
@@ -59,8 +60,8 @@ class PGStore(AbstractPoolStore):
                 "payment_type text, /* payment type: xch, wxch, maxi */"
                 "timestamp bigint,  /* payment timestamp */"
                 "points bigint,     /* points of farmer */"
-                "txid text,         /* payment tx id*/"
-                "note text          /* additional note */)"
+                "transaction_id text,"
+                "block_confirmed bigint)"
             )
         )
 
@@ -69,7 +70,7 @@ class PGStore(AbstractPoolStore):
         # snapshot table to keep track of farmer's points
         await self.connection.execute(
             (
-                "CREATE TABLE IF NOT EXISTS points_ss("
+                "CREATE TABLE IF NOT EXISTS points_snapshot("
                 "launcher_id text,  /* farmer */"
                 "points bigint,     /* farmer's points */"
                 "delay_time bigint, /* delayed time */"
@@ -82,11 +83,11 @@ class PGStore(AbstractPoolStore):
         await self.connection.execute(
             (
                 "CREATE TABLE IF NOT EXISTS rewards_tx("
-                "launcher_id text,  /* farmer*/"
-                "claimable bigint,  /* block reward*/"
-                "height bigint,     /* block height of the reward*/"
-                "coins text,        /* coin hash*/"
-                "timestamp bigint   /* timestamp of the record */)"
+                "launcher_id text,"  # farmer
+                "claimable bigint,"  # block reward
+                "block_height bigint,"  # block height of the reward
+                "coins_hash text,"  # coins hash
+                "timestamp bigint)"  # records timestamp
             )
         )
         await self.connection.execute("CREATE INDEX IF NOT EXISTS re_launcher_id_index on rewards_tx(launcher_id)")

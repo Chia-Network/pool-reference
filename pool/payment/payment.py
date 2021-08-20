@@ -1,12 +1,8 @@
 import asyncio
 import logging
-import pathlib
 import traceback
 from math import floor
 from typing import Dict, Optional, Set, List, Tuple, Callable
-
-import os
-import yaml
 import time
 
 from chia.rpc.wallet_rpc_client import WalletRpcClient
@@ -18,38 +14,34 @@ from chia.util.ints import uint8, uint16, uint32, uint64
 from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.util.chia_logging import initialize_logging
 from chia.wallet.transaction_record import TransactionRecord
 from chia.pools.pool_puzzles import (
     get_most_recent_singleton_coin_from_coin_spend,
 )
 
 from pool.singleton import create_absorb_transaction, get_singleton_state, get_coin_spend
-from pool.store.abstract import AbstractPoolStore
-from pool.store.sqlite_store import SqlitePoolStore
 
 from ..pay_record import PaymentRecord
 from ..reward_record import RewardRecord
+from ..store.abstract import AbstractPoolStore
 
 
 class Payment:
-    def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
+    def __init__(self,
+                 config: Dict,
+                 constants: ConsensusConstants,
+                 pool_config: Dict,
+                 store: AbstractPoolStore,
+                 node_rpc_client: Optional[FullNodeRpcClient] = None,
+                 wallet_rpc_client: Optional[WalletRpcClient] = None,
+                 ):
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
         self.log.basicConfig(level=logging.INFO)
 
-        # We load our configurations from here
-        with open(os.getcwd() + "/config.yaml") as f:
-            pool_config: Dict = yaml.safe_load(f)
-
-        pool_config["logging"]["log_filename"] = pool_config["logging"].get("payment_log_filename", "payment.log")
-
-        initialize_logging("pool", pool_config["logging"], pathlib.Path(pool_config["logging"]["log_path"]))
-
         self.config = config
         self.constants = constants
-
-        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        self.store = store
 
         self.pool_fee = pool_config["pool_fee"]
 
@@ -97,20 +89,19 @@ class Payment:
         self.collect_pool_rewards_loop_task: Optional[asyncio.Task] = None
         self.get_peak_loop_task: Optional[asyncio.Task] = None
 
-        self.node_rpc_client: Optional[FullNodeRpcClient] = None
+        self.node_rpc_client = node_rpc_client
         self.node_rpc_port = pool_config["node_rpc_port"]
-        self.wallet_rpc_client: Optional[WalletRpcClient] = None
+        self.wallet_rpc_client = wallet_rpc_client
         self.wallet_rpc_port = pool_config["wallet_rpc_port"]
+        self.rpc_hostname = pool_config.get("self_hostname") or self.config["self_hostname"]
 
     async def start(self):
-        await self.store.connect()
 
-        self_hostname = self.config["self_hostname"]
         self.node_rpc_client = await FullNodeRpcClient.create(
-            self_hostname, uint16(self.node_rpc_port), DEFAULT_ROOT_PATH, self.config
+            self.rpc_hostname, uint16(self.node_rpc_port), DEFAULT_ROOT_PATH, self.config
         )
         self.wallet_rpc_client = await WalletRpcClient.create(
-            self.config["self_hostname"], uint16(self.wallet_rpc_port), DEFAULT_ROOT_PATH, self.config
+            self.rpc_hostname, uint16(self.wallet_rpc_port), DEFAULT_ROOT_PATH, self.config
         )
         self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
         res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
@@ -141,7 +132,6 @@ class Payment:
         await self.wallet_rpc_client.await_closed()
         self.node_rpc_client.close()
         await self.node_rpc_client.await_closed()
-        await self.store.connection.close()
 
     async def get_peak_loop(self):
         """

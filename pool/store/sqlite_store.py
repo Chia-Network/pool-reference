@@ -217,13 +217,15 @@ class SqlitePoolStore(AbstractPoolStore):
         return ret
 
     async def snapshot_farmer_points(self) -> None:
-        await self.connection.execute(
+        cursor = await self.connection.execute(
             (
                 "INSERT into points_snapshot(launcher_id, points, timestamp, delay_time)"
                 "SELECT launcher_id, points, strftime('%s', 'now'), delay_time from farmer "
                 "WHERE points > 0"
             )
         )
+        await cursor.close()
+        await self.connection.commit()
 
     async def clear_farmer_points(self) -> None:
         # noinspection SqlWithoutWhere

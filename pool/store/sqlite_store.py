@@ -282,8 +282,8 @@ class SqlitePoolStore(AbstractPoolStore):
             (
                 reward.launcher_id.hex(),
                 reward.claimable,
-                reward.height,
-                reward.coins.hex(),
+                reward.block_height,
+                reward.coins_hash.hex(),
                 reward.timestamp
             )
         )

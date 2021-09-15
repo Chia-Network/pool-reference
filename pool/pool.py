@@ -47,7 +47,6 @@ from .difficulty_adjustment import get_new_difficulty
 from .singleton import create_absorb_transaction, get_singleton_state, get_coin_spend, get_farmed_height
 from .store.abstract import AbstractPoolStore
 from .store.sqlite_store import SqlitePoolStore
-from .store.mariadb_store import MariadbPoolStore
 from .record import FarmerRecord
 from .util import error_dict, RequestMetadata
 
@@ -79,6 +78,7 @@ class Pool:
         self.constants = constants
 
         if pool_config.get('store') == "MariadbPoolStore":
+            from .store.mariadb_store import MariadbPoolStore
             self.store: AbstractPoolStore = pool_store or MariadbPoolStore()
         else:
             self.store: AbstractPoolStore = pool_store or SqlitePoolStore()

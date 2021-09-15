@@ -80,11 +80,11 @@ class PoolServer:
         await self.pool.stop()
 
     def wrap_http_handler(self, f) -> Callable:
-        async def inner(request) -> aiohttp.web.Response:
+        async def inner(request) -> web.Response:
             try:
                 res_object = await f(request)
                 if res_object is None:
-                    res_object = {}
+                    res_object = web.Response()
             except Exception as e:
                 tb = traceback.format_exc()
                 self.log.warning(f"Error while handling message: {tb}")

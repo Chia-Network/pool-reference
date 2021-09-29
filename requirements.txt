@@ -1,6 +1,7 @@
-git+git://github.com/Chia-Network/chia-blockchain.git@main#egg=chia-blockchain
-blspy~=1.0.2
-setuptools~=56.1.0
-aiosqlite~=0.17.0
+git+git://github.com/Chia-Network/chia-blockchain.git@1.2.7#egg=chia-blockchain
 aiohttp~=3.7.4
+aiomysql~=0.0.21
+aiosqlite~=0.17.0
+blspy~=1.0.2
 pytest==6.2.4
+setuptools~=58.1.0

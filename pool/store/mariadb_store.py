@@ -10,7 +10,7 @@ import pymysql
 from blspy import G1Element
 from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.types.coin_solution import CoinSolution
+from chia.types.coin_spend import CoinSpend
 from chia.util.ints import uint64
 
 from .abstract import AbstractPoolStore
@@ -20,6 +20,7 @@ from ..util import RequestMetadata
 pymysql.converters.encoders[uint64] = pymysql.converters.escape_int
 pymysql.converters.conversions = pymysql.converters.encoders.copy()
 pymysql.converters.conversions.update(pymysql.converters.decoders)
+
 
 class MariadbPoolStore(AbstractPoolStore):
     """
@@ -35,11 +36,11 @@ class MariadbPoolStore(AbstractPoolStore):
             self.pool = await aiomysql.create_pool(
             minsize=1, 
             maxsize=12,
-            host=config["db_host"],
-            port=config["db_port"],
-            user=config["db_user"],
-            password=config["db_password"],
-            db=config["db_name"],
+            host=config["store"]["db_host"],
+            port=config["store"]["db_port"],
+            user=config["store"]["db_user"],
+            password=config["store"]["db_password"],
+            db=config["store"]["db_name"],
             )
         except pymysql.err.OperationalError as e:
                 self.log.error("Error In Database Config. Check your config file! %s", e)
@@ -84,7 +85,7 @@ class MariadbPoolStore(AbstractPoolStore):
             row[2],
             bytes.fromhex(row[3]),
             G1Element.from_bytes(bytes.fromhex(row[4])),
-            CoinSolution.from_bytes(row[5]),
+            CoinSpend.from_bytes(row[5]),
             PoolState.from_bytes(row[6]),
             row[7],
             row[8],
@@ -149,7 +150,7 @@ class MariadbPoolStore(AbstractPoolStore):
     async def update_singleton(
         self,
         launcher_id: bytes32,
-        singleton_tip: CoinSolution,
+        singleton_tip: CoinSpend,
         singleton_tip_state: PoolState,
         is_pool_member: bool,
     ):

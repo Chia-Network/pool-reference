@@ -77,7 +77,7 @@ class Pool:
         self.config = config
         self.constants = constants
 
-        if pool_config.get('store') == "MariadbPoolStore":
+        if pool_config["store"]["type"] == "mariadb":
             from .store.mariadb_store import MariadbPoolStore
             self.store: AbstractPoolStore = pool_store or MariadbPoolStore()
         else:

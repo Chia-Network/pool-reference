@@ -37,3 +37,10 @@ server:
   server_use_ssl: false
   server_ssl_crt: config/ssl/domain/domain_srv.crt
   server_ssl_key: config/ssl/domain/domain_srv.key
+store:
+  type: sqlite
+  db_host: localhost
+  db_port: 3306
+  db_user: pool-reference
+  db_password: supersecretpassword
+  db_name: pool-reference

@@ -12,7 +12,7 @@ An FAQ is provided here: https://github.com/Chia-Network/chia-blockchain/wiki/Po
 Several things are customizable in this pool reference. This includes:
 * How long the timeout is for leaving the pool
 * How difficulty adjustment happens
-* Fees to take, and how much to pay in blockchain fees  
+* Fees to take, and how much to pay in blockchain fees
 * How farmers' points are counted when paying (PPS, PPLNS, etc)
 * How farmers receive payouts (XCH, BTC, ETH, etc), and how often
 * What store (DB) is used - by default it's an SQLite db. Users can use their own store implementations, based on 
@@ -20,11 +20,11 @@ Several things are customizable in this pool reference. This includes:
 * What happens (in terms of response) after a successful login
 
 However, some things cannot be changed. These are described in SPECIFICATION.md, and mostly relate to validation,
-protocol, and the singleton format for smart coins. 
+protocol, and the singleton format for smart coins.
 
 ### Pool Protocol Benefits
 The Chia pool protocol has been designed for security, and decentralization, not relying on any 3rd party, closed code,
-or trusted behaviour. 
+or trusted behaviour.
 
 * The farmer can never steal from the pool by double farming
 * The farmer does not need collateral to join a pool, they only need a few cents to create a singleton
@@ -57,7 +57,7 @@ only 1 farmer needs to win a block, for the entire pool to be rewarded proportio
 
 The pool then keeps track of how many proofs (partials) each farmer sends, weighing them by difficulty. Occasionally 
 (for example every 3 days), the pool can perform a payout to farmers based on how many partials they submitted. Farmers
-with more space, and thus more points, will get linearly more rewards. 
+with more space, and thus more points, will get linearly more rewards.
 
 Instead of farmers using a `pool_public_key` when plotting, they now use a puzzle hash, referred to as the 
 `p2_singleton_puzzle_hash`, also known as the `pool_contract_address`. These values go into the plot itself, and 
@@ -66,7 +66,7 @@ address of a chialisp contract called a singleton. The farmer must first create 
 stores the pool information of the pool that that singleton is assigned to. When making a plot, the address of that
 singleton is used, and therefore that plot is tied to that singleton forever. When a block is found by the farmer, 
 the pool portion of the block rewards (7/8, or 1.75XCH) go into the singleton, and when claimed, 
-go directly to the pool's target address. 
+go directly to the pool's target address.
 
 The farmer can also configure their payout instructions, so that the pool knows where to send the occasional rewards
 to.
@@ -143,7 +143,7 @@ difficulty or pool payout info. The initial reference client and pool do not use
 - If < 45 minutes:
    - If have < 300 partials at this difficulty, maintain same difficulty
    - Else, multiply the difficulty by (24 * 3600 / (time taken for 300 partials))
-  
+
 The 6 hours is used to handle rare cases where a farmer's storage drops dramatically. The 45 minutes is similar, but
 for less extreme cases. Finally, the last case of < 45 minutes should properly handle users with increasing space,
 or slightly decreasing space. This targets 300 partials per day, but different numbers can be used based on
@@ -170,10 +170,10 @@ key you created in step 2. These can be obtained by doing `chia wallet show`.
 
 4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `config.yaml` 
 config file in `default_target_address` and `pool_fee_address` respectively.
-   
+
 5. Change the `pool_url` in `config.yaml` to point to your external ip or hostname. 
    This must match exactly with what the user enters into their UI or CLI, and must start with https://.
-   
+
 6. Start the node using `chia start farmer`, and log in to a different key (not the two keys created for the pool). 
 This will be referred to as the farmer's key here. Sync up your wallet on testnet for the farmer key. 
 You can log in to a key by running `chia wallet show` and then choosing each wallet in turn, to make them start syncing.
@@ -184,7 +184,7 @@ You can log in to a key by running `chia wallet show` and then choosing each wal
 cd pool-reference
 python3 -m venv ./venv
 source ./venv/bin/activate
-pip install ../chia-blockchain/ 
+pip install ../chia-blockchain/
 sudo CHIA_ROOT="/your/home/dir/.chia/testnet9" ./venv/bin/python -m pool
 ```
 
@@ -197,7 +197,7 @@ INFO:root:Obtaining balance: {'confirmed_wallet_balance': 0, 'max_send_amount': 
 8. Create a pool nft (on the farmer key) by doing `chia plotnft create -s pool -u https://127.0.0.1:80`, or whatever host:port you want
 to use for your pool. Approve it and wait for transaction confirmation. This url must match *exactly* with what the 
    pool uses.
-   
+
 9. Do `chia plotnft show` to ensure that your plotnft is created. Now start making some plots for this pool nft.
 You can make plots by specifying the -c argument in `chia plots create`. Make sure to *not* use the `-p` argument. The 
     value you should use for -c is the `P2 singleton address` from `chia plotnft show` output.
@@ -206,8 +206,6 @@ will be the following in the pool if everything is working:
 ```
 INFO:root:Returning {'new_difficulty': 1963211364}, time: 0.017535686492919922 singleton: 0x1f8dab79a614a82f9834c8f395f5fe195ae020807169b71a10218b9788a7a573
 ```
-    
+
 Please send a message to @sorgente711 on keybase if you have questions about the 9 steps explained above. All other questions
 should be send to the #pools channel in keybase. 
-
- 

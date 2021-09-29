@@ -28,23 +28,23 @@ class MariadbPoolStore(AbstractPoolStore):
     """
     async def connect(self):
         try:
-            #initialize logging 
+            # initialize logging
             self.log = logging
-            #load config 
+            # load config
             with open(os.getcwd() + "/config.yaml") as f:
                 config: Dict = yaml.safe_load(f)
             self.pool = await aiomysql.create_pool(
-            minsize=1, 
-            maxsize=12,
-            host=config["store"]["db_host"],
-            port=config["store"]["db_port"],
-            user=config["store"]["db_user"],
-            password=config["store"]["db_password"],
-            db=config["store"]["db_name"],
+                minsize=1,
+                maxsize=12,
+                host=config["store"]["db_host"],
+                port=config["store"]["db_port"],
+                user=config["store"]["db_user"],
+                password=config["store"]["db_password"],
+                db=config["store"]["db_name"],
             )
         except pymysql.err.OperationalError as e:
-                self.log.error("Error In Database Config. Check your config file! %s", e)
-                raise ConnectionError('Unable to Connect to SQL Database.')
+            self.log.error("Error In Database Config. Check your config file! %s", e)
+            raise ConnectionError('Unable to Connect to SQL Database.')
         self.connection = await self.pool.acquire()
         self.cursor = await self.connection.cursor()
         await self.cursor.execute(
@@ -75,7 +75,6 @@ class MariadbPoolStore(AbstractPoolStore):
         await self.cursor.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
         await self.connection.commit()
         self.pool.release(self.connection)
-        
 
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:
@@ -130,7 +129,7 @@ class MariadbPoolStore(AbstractPoolStore):
         with (await self.pool) as connection:
             cursor = await connection.cursor()
             await cursor.execute(
-                f"SELECT * FROM farmer WHERE launcher_id=%s",(launcher_id.hex(),),
+                f"SELECT * FROM farmer WHERE launcher_id=%s", (launcher_id.hex(),),
             )
             row = await cursor.fetchone()
             if row is None:
@@ -145,7 +144,6 @@ class MariadbPoolStore(AbstractPoolStore):
                 f"UPDATE farmer SET difficulty=%s WHERE launcher_id=%s", (difficulty, launcher_id.hex())
             )
             await connection.commit()
-        
 
     async def update_singleton(
         self,
@@ -172,7 +170,7 @@ class MariadbPoolStore(AbstractPoolStore):
 
             all_phs: Set[bytes32] = set()
             for row in rows:
-              all_phs.add(bytes32(bytes.fromhex(row[0])))
+                all_phs.add(bytes32(bytes.fromhex(row[0])))
             return all_phs
 
     async def get_farmer_records_for_p2_singleton_phs(self, puzzle_hashes: Set[bytes32]) -> List[FarmerRecord]:
@@ -216,12 +214,10 @@ class MariadbPoolStore(AbstractPoolStore):
             await cursor.close()
             await connection.commit()
 
-
     async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
         with (await self.pool) as connection:
             cursor = await connection.cursor()
-            await cursor.execute("INSERT INTO partial VALUES(%s, %s, %s)",(launcher_id.hex(), timestamp, difficulty),
-            )
+            await cursor.execute("INSERT INTO partial VALUES(%s, %s, %s)", (launcher_id.hex(), timestamp, difficulty),)
             await connection.commit()
         with (await self.pool) as connection:
             cursor = await connection.cursor()
@@ -241,4 +237,3 @@ class MariadbPoolStore(AbstractPoolStore):
             rows = await cursor.fetchall()
             ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]
             return ret
-        

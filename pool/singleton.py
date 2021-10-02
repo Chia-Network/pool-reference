@@ -5,7 +5,7 @@ from blspy import G2Element
 from chia.consensus.coinbase import pool_parent_id
 from chia.pools.pool_puzzles import (
     create_absorb_spend,
-    solution_to_extra_data,
+    solution_to_pool_state,
     get_most_recent_singleton_coin_from_coin_spend,
     pool_state_to_inner_puzzle,
     create_full_puzzle,
@@ -67,7 +67,7 @@ async def get_singleton_state(
 
             last_spend: Optional[CoinSpend] = await get_coin_spend(node_rpc_client, launcher_coin)
             delay_time, delay_puzzle_hash = get_delayed_puz_info_from_launcher_spend(last_spend)
-            saved_state = solution_to_extra_data(last_spend)
+            saved_state = solution_to_pool_state(last_spend)
             assert last_spend is not None and saved_state is not None
         else:
             last_spend = farmer_record.singleton_tip
@@ -107,7 +107,7 @@ async def get_singleton_state(
             last_spend: Optional[CoinSpend] = await get_coin_spend(node_rpc_client, next_coin_record)
             assert last_spend is not None
 
-            pool_state: Optional[PoolState] = solution_to_extra_data(last_spend)
+            pool_state: Optional[PoolState] = solution_to_pool_state(last_spend)
 
             if pool_state is not None:
                 last_not_none_state = pool_state

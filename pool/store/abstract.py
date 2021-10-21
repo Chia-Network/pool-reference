@@ -18,6 +18,7 @@ class AbstractPoolStore(ABC):
 
     def __init__(self):
         self.lock = asyncio.Lock()
+        self.connection = None
 
     @abstractmethod
     async def connect(self):

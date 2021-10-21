@@ -85,6 +85,15 @@ class TestDifficulty(unittest.TestCase):
 
         assert get_new_difficulty(partials, num_partials, time_target, 20, current_time, 1) == 15
 
+    def test_partials_low_24h_decreases_diff(self):
+        num_partials = 150
+        time_target = 24 * 3600
+        partials = []
+        current_time = uint64(time.time())
+        for i in range(num_partials):
+            partials.append((uint64(current_time - (i) * 600), 20))
+
+        assert get_new_difficulty(partials, num_partials * 2, time_target, 20, current_time, 1) == 9
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,9 +6,6 @@ import traceback
 from asyncio import Task
 from typing import Dict, Optional, Tuple, Callable
 
-import os
-import yaml
-
 from blspy import AugSchemeMPL, G1Element
 from chia.consensus.block_rewards import calculate_pool_reward
 from chia.pools.pool_wallet_info import PoolState, PoolSingletonState
@@ -58,6 +55,7 @@ class Pool:
     def __init__(
         self,
         config: Dict,
+        pool_config: Dict,
         constants: ConsensusConstants,
         pool_store: Optional[AbstractPoolStore] = None,
         difficulty_function: Callable = get_new_difficulty,
@@ -67,10 +65,6 @@ class Pool:
         self.log = logging
         # If you want to log to a file: use filename='example.log', encoding='utf-8'
         self.log.basicConfig(level=logging.INFO)
-
-        # We load our configurations from here
-        with open(os.getcwd() + "/config.yaml") as f:
-            pool_config: Dict = yaml.safe_load(f)
 
         initialize_logging("pool", pool_config["logging"], pathlib.Path(pool_config["logging"]["log_path"]))
 
@@ -84,7 +78,12 @@ class Pool:
         self.config = config
         self.constants = constants
 
-        self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+        if pool_config.get('store') == "MariadbPoolStore":
+            from .store.mariadb_store import MariadbPoolStore
+            self.store: AbstractPoolStore = pool_store or MariadbPoolStore()
+        else:
+            self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
+
         self.pool_fee = pool_config["pool_fee"]
 
         self.payment_manager: AbstractPaymentManager = payment_manger or DefaultPaymentManager(
@@ -251,7 +250,7 @@ class Pool:
 
                 # For each p2sph, get the FarmerRecords
                 farmer_records = await self.store.get_farmer_records_for_p2_singleton_phs(
-                    set([ph for ph in ph_to_amounts.keys()])
+                    set(ph for ph in ph_to_amounts.keys())
                 )
 
                 # For each singleton, create, submit, and save a claim transaction
@@ -334,7 +333,9 @@ class Pool:
                 self.log.info("Starting to create payment")
 
                 coin_records: List[CoinRecord] = await self.node_rpc_client.get_coin_records_by_puzzle_hash(
-                    self.default_target_puzzle_hash, include_spent_coins=False
+                    self.default_target_puzzle_hash,
+                    include_spent_coins=False,
+                    start_height=self.scan_start_height,
                 )
 
                 if len(coin_records) == 0:
@@ -348,6 +349,7 @@ class Pool:
 
                 if total_amount_claimed < calculate_pool_reward(uint32(1)):  # 1.75 XCH
                     self.log.info(f"Do not have enough funds to distribute: {total_amount_claimed}, skipping payout")
+                    await asyncio.sleep(120)
                     continue
 
                 self.log.info(f"Total amount claimed: {total_amount_claimed / (10 ** 12)}")
@@ -413,7 +415,7 @@ class Pool:
                 # TODO(pool): make sure you have enough to pay the blockchain fee, this will be taken out of the pool
                 # fee itself. Alternatively you can set it to 0 and wait longer
                 # blockchain_fee = 0.00001 * (10 ** 12) * len(payment_targets)
-                blockchain_fee = 0
+                blockchain_fee: uint64 = uint64(0)
                 try:
                     transaction: TransactionRecord = await self.wallet_rpc_client.send_transaction_multi(
                         self.wallet_id, payment_targets, fee=blockchain_fee

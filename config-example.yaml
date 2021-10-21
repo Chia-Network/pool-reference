@@ -31,3 +31,9 @@ logging:
   log_level: INFO
   log_maxfilesrotation: 7
   log_stdout: false
+server:
+  server_host: 0.0.0.0
+  server_port: 80
+  server_use_ssl: false
+  server_ssl_crt: config/ssl/domain/domain_srv.crt
+  server_ssl_key: config/ssl/domain/domain_srv.key

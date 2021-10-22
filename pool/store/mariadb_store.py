@@ -96,7 +96,10 @@ class MariadbPoolStore(AbstractPoolStore):
         with (await self.pool) as connection:
             cursor = await connection.cursor()
             await cursor.execute(
-                f"INSERT INTO farmer VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE launcher_id=%s, p2_singleton_puzzle_hash=%s, delay_time=%s, delay_puzzle_hash=%s, authentication_public_key=%s, singleton_tip=%s, singleton_tip_state=%s, points=%s, difficulty=%s, payout_instructions=%s,is_pool_member=%s",
+                f"INSERT INTO farmer VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) " 
+                f"ON DUPLICATE KEY UPDATE p2_singleton_puzzle_hash=%s, delay_time=%s, delay_puzzle_hash=%s,"
+                f"authentication_public_key=%s, singleton_tip=%s, singleton_tip_state=%s, payout_instructions=%s, " 
+                f"is_pool_member=%s",
                 (
                     farmer_record.launcher_id.hex(),
                     farmer_record.p2_singleton_puzzle_hash.hex(),
@@ -109,15 +112,12 @@ class MariadbPoolStore(AbstractPoolStore):
                     farmer_record.difficulty,
                     farmer_record.payout_instructions,
                     int(farmer_record.is_pool_member),
-                    farmer_record.launcher_id.hex(),
                     farmer_record.p2_singleton_puzzle_hash.hex(),
                     farmer_record.delay_time,
                     farmer_record.delay_puzzle_hash.hex(),
                     bytes(farmer_record.authentication_public_key).hex(),
                     bytes(farmer_record.singleton_tip),
                     bytes(farmer_record.singleton_tip_state),
-                    farmer_record.points,
-                    farmer_record.difficulty,
                     farmer_record.payout_instructions,
                     int(farmer_record.is_pool_member),
                 ),

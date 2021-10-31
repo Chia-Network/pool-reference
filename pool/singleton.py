@@ -141,7 +141,7 @@ async def create_absorb_transaction(
     peak_height: uint32,
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
-    additonal_spend_bundle: Optional[SpendBundle],
+    additonal_spend_bundle: Optional[SpendBundle] = None,
 ) -> Optional[SpendBundle]:
     singleton_state_tuple: Optional[Tuple[CoinSpend, PoolState, PoolState]] = await get_singleton_state(
         node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0, genesis_challenge

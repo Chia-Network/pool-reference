@@ -24,6 +24,7 @@ from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.coin_record import CoinRecord
 from chia.types.coin_spend import CoinSpend
+from chia.types.spend_bundle import SpendBundle
 from chia.util.bech32m import decode_puzzle_hash
 from chia.consensus.constants import ConsensusConstants
 from chia.util.ints import uint8, uint16, uint32, uint64
@@ -161,6 +162,12 @@ class Pool:
 
         # Whether or not the wallet is synced (required to make payments)
         self.wallet_synced = False
+
+        # The fee to pay ( In mojo ) when claiming a block reward
+        self.claim_fee: uint64 = uint64(pool_config.get("block_claim_fee", 0))
+
+        # pools address for use as a placeholder when making fee spendbundles
+        self.default_target_address = pool_config["default_target_address"]
 
         # We target these many partials for this number of seconds. We adjust after receiving this many partials.
         self.number_of_partials_target: int = pool_config["number_of_partials_target"]
@@ -322,12 +329,21 @@ class Pool:
                             )
                             continue
 
+                        if self.claim_fee > 0:
+                            # address can be anything
+                            signed_transaction: TransactionRecord = await self.wallet_rpc_client.create_basic_signed_transaction(
+                                wallet_id=self.wallet_id, amount=uint64(0), address=self.default_target_address, 
+                                fee=self.claim_fee)
+                            fee_spend_bundle: SpendBundle = signed_transaction.spend_bundle
+                        else:
+                            fee_spend_bundle: Optional[SpendBundle] = None
                         spend_bundle = await create_absorb_transaction(
                             self.node_rpc_client,
                             rec,
                             self.blockchain_state["peak"].height,
                             ph_to_coins[rec.p2_singleton_puzzle_hash],
                             self.constants.GENESIS_CHALLENGE,
+                            fee_spend_bundle
                         )
 
                         if spend_bundle is None:

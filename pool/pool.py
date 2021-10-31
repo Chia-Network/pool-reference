@@ -78,8 +78,9 @@ class Pool:
         self.config = config
         self.constants = constants
 
-        if pool_config.get('store') == "MariadbPoolStore":
+        if pool_config.get("store") == "MariadbPoolStore":
             from .store.mariadb_store import MariadbPoolStore
+
             self.store: AbstractPoolStore = pool_store or MariadbPoolStore()
         else:
             self.store: AbstractPoolStore = pool_store or SqlitePoolStore()
@@ -305,9 +306,9 @@ class Pool:
                         not_claimable_amounts += ph_to_amounts[rec.p2_singleton_puzzle_hash]
 
                 if len(coin_records) > 0:
-                    self.log.info(f"Claimable amount: {claimable_amounts / (10**12)}")
-                    self.log.info(f"Not claimable amount: {not_claimable_amounts / (10**12)}")
-                    self.log.info(f"Not buried amounts: {not_buried_amounts / (10**12)}")
+                    self.log.info(f"Claimable amount: {claimable_amounts / (10 ** 12)}")
+                    self.log.info(f"Not claimable amount: {not_claimable_amounts / (10 ** 12)}")
+                    self.log.info(f"Not buried amounts: {not_buried_amounts / (10 ** 12)}")
 
                 for rec in farmer_records:
                     if rec.is_pool_member:
@@ -331,9 +332,14 @@ class Pool:
 
                         if self.claim_fee > 0:
                             # address can be anything
-                            signed_transaction: TransactionRecord = await self.wallet_rpc_client.create_basic_signed_transaction(
-                                wallet_id=self.wallet_id, amount=uint64(0), address=self.default_target_address,
-                                fee=self.claim_fee)
+                            signed_transaction: TransactionRecord = (
+                                await self.wallet_rpc_client.create_basic_signed_transaction(
+                                    wallet_id=self.wallet_id,
+                                    amount=uint64(0),
+                                    address=self.default_target_address,
+                                    fee=self.claim_fee,
+                                )
+                            )
                             fee_spend_bundle: SpendBundle = signed_transaction.spend_bundle
                         else:
                             fee_spend_bundle: Optional[SpendBundle] = None
@@ -343,7 +349,7 @@ class Pool:
                             self.blockchain_state["peak"].height,
                             ph_to_coins[rec.p2_singleton_puzzle_hash],
                             self.constants.GENESIS_CHALLENGE,
-                            fee_spend_bundle
+                            fee_spend_bundle,
                         )
 
                         if spend_bundle is None:
@@ -404,8 +410,8 @@ class Pool:
                     continue
 
                 self.log.info(f"Total amount claimed: {total_amount_claimed / (10 ** 12)}")
-                self.log.info(f"Pool coin amount (includes blockchain fee) {pool_coin_amount  / (10 ** 12)}")
-                self.log.info(f"Total amount to distribute: {amount_to_distribute  / (10 ** 12)}")
+                self.log.info(f"Pool coin amount (includes blockchain fee) {pool_coin_amount / (10 ** 12)}")
+                self.log.info(f"Total amount to distribute: {amount_to_distribute / (10 ** 12)}")
 
                 async with self.store.lock:
                     # Get the points of each farmer, as well as payout instructions. Here a chia address is used,

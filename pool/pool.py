@@ -167,9 +167,6 @@ class Pool:
         # The fee to pay ( In mojo ) when claiming a block reward
         self.claim_fee: uint64 = uint64(pool_config.get("block_claim_fee", 0))
 
-        # pools address for use as a placeholder when making fee spendbundles
-        self.default_target_address = pool_config["default_target_address"]
-
         # We target these many partials for this number of seconds. We adjust after receiving this many partials.
         self.number_of_partials_target: int = pool_config["number_of_partials_target"]
         self.time_target: int = pool_config["time_target"]
@@ -334,7 +331,7 @@ class Pool:
                             # address can be anything
                             signed_transaction: TransactionRecord = (
                                 await self.wallet_rpc_client.create_signed_transaction(
-                                    additions=[{"amount": uint64(1), "address": self.default_target_address}],
+                                    additions=[{"amount": uint64(1), "address": self.default_target_puzzle_hash}],
                                     fee=self.claim_fee,
                                 )
                             )

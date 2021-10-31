@@ -332,7 +332,7 @@ class Pool:
                         if self.claim_fee > 0:
                             # address can be anything
                             signed_transaction: TransactionRecord = await self.wallet_rpc_client.create_basic_signed_transaction(
-                                wallet_id=self.wallet_id, amount=uint64(0), address=self.default_target_address, 
+                                wallet_id=self.wallet_id, amount=uint64(0), address=self.default_target_address,
                                 fee=self.claim_fee)
                             fee_spend_bundle: SpendBundle = signed_transaction.spend_bundle
                         else:

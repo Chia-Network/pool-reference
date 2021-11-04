@@ -327,24 +327,14 @@ class Pool:
                             )
                             continue
 
-                        if self.claim_fee > 0:
-                            # address can be anything
-                            signed_transaction: TransactionRecord = (
-                                await self.wallet_rpc_client.create_signed_transaction(
-                                    additions=[{"amount": uint64(1), "address": self.default_target_puzzle_hash}],
-                                    fee=self.claim_fee,
-                                )
-                            )
-                            fee_spend_bundle: SpendBundle = signed_transaction.spend_bundle
-                        else:
-                            fee_spend_bundle: Optional[SpendBundle] = None
                         spend_bundle = await create_absorb_transaction(
                             self.node_rpc_client,
+                            self.wallet_rpc_client,
                             rec,
                             self.blockchain_state["peak"].height,
                             ph_to_coins[rec.p2_singleton_puzzle_hash],
                             self.constants.GENESIS_CHALLENGE,
-                            fee_spend_bundle,
+                            self.claim_fee,
                         )
 
                         if spend_bundle is None:

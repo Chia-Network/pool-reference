@@ -14,7 +14,6 @@ from chia.pools.pool_puzzles import (
 from chia.pools.pool_wallet import PoolSingletonState
 from chia.pools.pool_wallet_info import PoolState
 from chia.rpc.full_node_rpc_client import FullNodeRpcClient
-from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.program import Program, SerializedProgram
 from chia.types.blockchain_format.sized_bytes import bytes32
@@ -22,7 +21,6 @@ from chia.types.coin_record import CoinRecord
 from chia.types.coin_spend import CoinSpend
 from chia.types.spend_bundle import SpendBundle
 from chia.util.ints import uint32, uint64
-from chia.wallet.transaction_record import TransactionRecord
 
 from .record import FarmerRecord
 
@@ -139,12 +137,11 @@ def get_farmed_height(reward_coin_record: CoinRecord, genesis_challenge: bytes32
 
 async def create_absorb_transaction(
     node_rpc_client: FullNodeRpcClient,
-    wallet_rpc_client: WalletRpcClient,
     farmer_record: FarmerRecord,
     peak_height: uint32,
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
-    fee: Optional[uint64] = uint64(0),  # just in case.
+    additional_spend_bundle: Optional[SpendBundle] = None,
 ) -> Optional[SpendBundle]:
     singleton_state_tuple: Optional[Tuple[CoinSpend, PoolState, PoolState]] = await get_singleton_state(
         node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0, genesis_challenge
@@ -165,7 +162,6 @@ async def create_absorb_transaction(
     )
     assert launcher_coin_record is not None
 
-    fee_spends: Optional[SpendBundle] = None
     all_spends: List[CoinSpend] = []
     for reward_coin_record in reward_coin_records:
         found_block_index: Optional[uint32] = get_farmed_height(reward_coin_record, genesis_challenge)
@@ -182,22 +178,6 @@ async def create_absorb_transaction(
             farmer_record.delay_time,
             farmer_record.delay_puzzle_hash,
         )
-        if fee > 0:
-            block_coin_spend: CoinSpend = absorb_spend[1]  # we know that the new coin is created 2nd
-
-            signed_transaction: TransactionRecord = await wallet_rpc_client.create_signed_transaction(
-                coins=[block_coin_spend.coin],  # coin to spend.
-                additions=[
-                    {"amount": block_coin_spend.coin.amount - fee, "address": block_coin_spend.coin.puzzle_hash}
-                ],
-                fee=fee,
-            )
-            fee_spend_bundle: SpendBundle = signed_transaction.spend_bundle  # get spend bundle from transaction
-            if fee_spends is None:
-                fee_spends: SpendBundle = fee_spend_bundle
-            else:
-                fee_spends = SpendBundle.aggregate([fee_spends, fee_spend_bundle])
-
         last_spend = absorb_spend[0]
         all_spends += absorb_spend
         # TODO(pool): handle the case where the cost exceeds the size of the block
@@ -210,7 +190,7 @@ async def create_absorb_transaction(
     if len(all_spends) == 0:
         return None
     spend_bundle: SpendBundle = SpendBundle(all_spends, G2Element())
-    if fee_spends is not None:
-        spend_bundle = SpendBundle.aggregate([spend_bundle, fee_spends])
+    if additional_spend_bundle:
+        spend_bundle = SpendBundle.aggregate([spend_bundle, additional_spend_bundle])
 
     return spend_bundle

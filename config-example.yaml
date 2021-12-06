@@ -37,3 +37,4 @@ server:
   server_use_ssl: false
   server_ssl_crt: config/ssl/domain/domain_srv.crt
   server_ssl_key: config/ssl/domain/domain_srv.key
+fee_spend_filename: /path/to/your/fee_spend.json

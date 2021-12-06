@@ -141,6 +141,7 @@ async def create_absorb_transaction(
     peak_height: uint32,
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
+    fee_spend: SpendBundle,
 ) -> Optional[SpendBundle]:
     singleton_state_tuple: Optional[Tuple[CoinSpend, PoolState, PoolState]] = await get_singleton_state(
         node_rpc_client, farmer_record.launcher_id, farmer_record, peak_height, 0, genesis_challenge
@@ -188,4 +189,7 @@ async def create_absorb_transaction(
 
     if len(all_spends) == 0:
         return None
+    if fee_spend is not None:
+        self.log.info(f"Creating absorb tx with fee {fee_spend.fees()}")
+        all_spends += fee_spend
     return SpendBundle(all_spends, G2Element())

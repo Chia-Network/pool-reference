@@ -3,6 +3,7 @@ import logging
 import pathlib
 import time
 import traceback
+import json
 from asyncio import Task
 from math import floor
 from typing import Dict, Optional, Set, List, Tuple, Callable
@@ -24,6 +25,7 @@ from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.coin_record import CoinRecord
 from chia.types.coin_spend import CoinSpend
+from chia.types.spend_bundle import SpendBundle
 from chia.util.bech32m import decode_puzzle_hash
 from chia.consensus.constants import ConsensusConstants
 from chia.util.ints import uint8, uint16, uint32, uint64
@@ -73,6 +75,11 @@ class Pool:
         self.info_logo_url = pool_config["pool_info"]["logo_url"]
         self.info_description = pool_config["pool_info"]["description"]
         self.welcome_message = pool_config["welcome_message"]
+        # Place a file containing a fee spend at the fee_spend_filename, to be used the next time the
+        # system creates a claim spend in `create_absorb_transaction`
+        # This must be a different fee spend each time - it cannot be reused
+        #  Use an absolute path so you don't have to worry about your process working directory
+        self.fee_spend_filename = pool_config["fee_spend_filename"]
 
         self.config = config
         self.constants = constants
@@ -241,6 +248,30 @@ class Pool:
                 self.log.error(f"Unexpected error in get_peak_loop: {e}")
                 await asyncio.sleep(30)
 
+    def read_next_fee_spend_bundle(self, fee_spend_filename) -> Optional[SpendBundle]:
+        """
+        Read a `Spendbundle` from a file, in JSON format, to be used as a fee spend
+        We expect the file to be moved to {filename}.used after we attempt to use it
+        This spend can be from any wallet, and must already be signed
+        Return None if there is an error reading the file or its contents
+        """
+        from pathlib import Path
+        path = Path(fee_spend_filename)
+        if not path.is_file():
+            return None
+
+        self.log.info("Using {fee_spend_filename} as fee for absorb transaction.")
+
+        try:
+            with path.open(mode='r') as fee_spend_file:
+                file_data = fee_spend_file.read()
+            json_data = json.load(file_data)
+            return SpendBundle.from_json_dict(json_data)
+        except Exception as e:
+            error_stack = traceback.format_exc()
+            self.log.error(f"Unexpected error reading {fee_spend_filename}: {e} {error_stack}")
+        return None
+
     async def collect_pool_rewards_loop(self):
         """
         Iterates through the blockchain, looking for pool rewards, and claims them, creating a transaction to the
@@ -322,16 +353,20 @@ class Pool:
                             )
                             continue
 
+                        fee_spend = self.read_next_fee_spend_bundle(self.fee_spend_filename)
                         spend_bundle = await create_absorb_transaction(
                             self.node_rpc_client,
                             rec,
                             self.blockchain_state["peak"].height,
                             ph_to_coins[rec.p2_singleton_puzzle_hash],
                             self.constants.GENESIS_CHALLENGE,
+                            fee_spend,
                         )
 
                         if spend_bundle is None:
                             continue
+                        elif fee_spend:
+                            Path(self.fee_spend_filename).rename(f"{self.fee_spend_filename}.used")
 
                         push_tx_response: Dict = await self.node_rpc_client.push_tx(spend_bundle)
                         if push_tx_response["status"] == "SUCCESS":

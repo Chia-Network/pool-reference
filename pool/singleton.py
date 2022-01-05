@@ -194,12 +194,9 @@ async def create_absorb_transaction(
 
     if fee_amount > 0:
         # address can be anything
-        signed_transaction: TransactionRecord = (
-            await wallet_rpc_client.create_signed_transaction(
-                additions=[{"amount": uint64(1), "address": fee_target_puzzle_hash}],
-                fee=fee_amount,
-
-            )
+        signed_transaction: TransactionRecord = await wallet_rpc_client.create_signed_transaction(
+            additions=[{"amount": uint64(1), "address": fee_target_puzzle_hash}],
+            fee=fee_amount,
         )
         fee_spend_bundle: SpendBundle = signed_transaction.spend_bundle
     else:

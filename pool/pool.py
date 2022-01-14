@@ -565,7 +565,7 @@ class Pool:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
             
-    async def validate_payout_instructions(self, payout_instructions: str) -> List[bool,Optional[bytes32]]:
+    async def validate_payout_instructions(self, payout_instructions: str) -> List[bool, Optional[bytes32]]:
         """
         Returns the puzzle hash from the payout instructions (puzzle hash hex or bech32m address) if it's encoded
         correctly, otherwise returns None.

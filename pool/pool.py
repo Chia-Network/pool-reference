@@ -613,10 +613,12 @@ class Pool:
                 difficulty = request.payload.suggested_difficulty
 
             if len(hexstr_to_bytes(request.payload.payout_instructions)) != 32:
-                return error_dict(
-                    PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS,
-                    f"Payout instructions must be an xch address or puzzle hash for this pool.",
-                )
+                request.payload.payout_instructions = await self.validate_payout_instructions(request.payload.payout_instructions)
+                if len(hexstr_to_bytes(request.payload.payout_instructions)) != 32:
+                    return error_dict(
+                        PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS,
+                        f"Payout instructions must be an xch address or puzzle hash for this pool.",
+                    )
 
             if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
                 return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")

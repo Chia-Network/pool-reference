@@ -177,7 +177,7 @@ async def create_absorb_transaction(
             log.info(f"Received reward {reward_coin_record.coin} that is not a pool reward.")
             continue
         else:
-            coinbase_coin_records += reward_coin_record
+            coinbase_coin_records.append(reward_coin_record)
         absorb_spend: List[CoinSpend] = create_absorb_spend(
             last_spend,
             last_state,
@@ -199,7 +199,7 @@ async def create_absorb_transaction(
     if fee_amount > 0:
         # address can be anything
         signed_transaction: TransactionRecord = await wallet_rpc_client.create_signed_transaction(
-            additions=[{"amount": uint64(1), "address": fee_target_puzzle_hash}],
+            additions=[{"amount": uint64(1), "puzzle_hash": fee_target_puzzle_hash}],
             fee=fee_amount,
             puzzle_announcements=[
                 Announcement(coin_record.coin.puzzle_hash, coin_record.coin.name())

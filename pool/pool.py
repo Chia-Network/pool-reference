@@ -565,24 +565,24 @@ class Pool:
             error_stack = traceback.format_exc()
             self.log.error(f"Exception in confirming partial: {e} {error_stack}")
             
-    async def validate_payout_instructions(self, payout_instructions: str) -> List[bool, Optional[bytes32]]:
+    async def validate_payout_instructions(self, payout_instructions: str) -> Optional[str]:
         """
-        Returns the puzzle hash from the payout instructions (puzzle hash hex or bech32m address) if it's encoded
+        Returns the puzzle hash as a hex string from the payout instructions (puzzle hash hex or bech32m address) if it's encoded
         correctly, otherwise returns None.
         """
         try:
             if len(decode_puzzle_hash(payout_instructions)) == 32:
-                return [True, decode_puzzle_hash(payout_instructions)]
-        except Exception:
+                return decode_puzzle_hash(payout_instructions).hex()
+        except ValueError:
             # Not a Chia address
             pass
         try:
             if len(hexstr_to_bytes(payout_instructions)) == 32:
-                return [True, hexstr_to_bytes(payout_instructions)]
-        except Exception:
+                return payout_instructions
+        except ValueError:
             # Not a puzzle hash
             pass
-        return [False, None]
+        return None
 
 
     async def add_farmer(self, request: PostFarmerRequest, metadata: RequestMetadata) -> Dict:
@@ -688,10 +688,10 @@ class Pool:
                 farmer_dict["authentication_public_key"] = request.payload.authentication_public_key
 
         if request.payload.payout_instructions is not None:
-            new_ph = self.validate_payout_instructions(request.payload.payout_instructions)
-            response_dict["payout_instructions"] = new_ph[0]
-            if new_ph[0]:
-                farmer_dict["payout_instructions"] = new_ph[1]
+            new_ph: Optional[str] = self.validate_payout_instructions(request.payload.payout_instructions)
+            response_dict["payout_instructions"] = new_ph
+            if new_ph:
+                farmer_dict["payout_instructions"] = new_ph
 
         if request.payload.suggested_difficulty is not None:
             is_new_value = (

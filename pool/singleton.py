@@ -196,11 +196,11 @@ async def create_absorb_transaction(
         #  - create an output with slightly less XCH, to yourself. for example, 1.7499 XCH
         #  - The remaining value will automatically be used as a fee
 
-    if fee_amount > 0:
+    if fee_amount > 0 and len(coinbase_coin_records) > 0:
         # address can be anything
         signed_transaction: TransactionRecord = await wallet_rpc_client.create_signed_transaction(
             additions=[{"amount": uint64(1), "puzzle_hash": fee_target_puzzle_hash}],
-            fee=fee_amount,
+            fee=uint64(fee_amount * len(coinbase_coin_records)),
             puzzle_announcements=[
                 Announcement(coin_record.coin.puzzle_hash, coin_record.coin.name())
                 for coin_record in coinbase_coin_records

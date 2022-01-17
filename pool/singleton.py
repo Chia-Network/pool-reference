@@ -167,7 +167,7 @@ async def create_absorb_transaction(
         farmer_record.launcher_id
     )
     assert launcher_coin_record is not None
-    coinbase_coin_records: List[CoinRecord] = []
+    coin_announcements: List[Announcement] = []
 
     all_spends: List[CoinSpend] = []
     for reward_coin_record in reward_coin_records:
@@ -176,8 +176,6 @@ async def create_absorb_transaction(
             # The puzzle does not allow spending coins that are not a coinbase reward
             log.info(f"Received reward {reward_coin_record.coin} that is not a pool reward.")
             continue
-        else:
-            coinbase_coin_records.append(reward_coin_record)
         absorb_spend: List[CoinSpend] = create_absorb_spend(
             last_spend,
             last_state,
@@ -187,24 +185,18 @@ async def create_absorb_transaction(
             farmer_record.delay_time,
             farmer_record.delay_puzzle_hash,
         )
+        if fee_amount > 0:
+            coin_announcements.append(Announcement(reward_coin_record.coin.name(), b"$"))
         last_spend = absorb_spend[0]
         all_spends += absorb_spend
         # TODO(pool): handle the case where the cost exceeds the size of the block
-        # TODO(pool): If you want to add a fee, you should do the following:
-        #  - only absorb one reward at a time
-        #  - spend the coin that you are receiving in the same spend bundle that it is created
-        #  - create an output with slightly less XCH, to yourself. for example, 1.7499 XCH
-        #  - The remaining value will automatically be used as a fee
 
-    if fee_amount > 0 and len(coinbase_coin_records) > 0:
+    if len(coin_announcements) > 0:
         # address can be anything
         signed_transaction: TransactionRecord = await wallet_rpc_client.create_signed_transaction(
             additions=[{"amount": uint64(1), "puzzle_hash": fee_target_puzzle_hash}],
-            fee=uint64(fee_amount * len(coinbase_coin_records)),
-            puzzle_announcements=[
-                Announcement(coin_record.coin.puzzle_hash, coin_record.coin.name())
-                for coin_record in coinbase_coin_records
-            ],
+            fee=uint64(fee_amount * len(coin_announcements)),
+            coin_announcements=coin_announcements,
         )
         fee_spend_bundle: Optional[SpendBundle] = signed_transaction.spend_bundle
     else:

@@ -21,6 +21,7 @@ class RequestMetadata:
     """
     HTTP-related metadata passed with HTTP requests
     """
+
     url: str  # original request url, as used by the client
     scheme: str  # for example https
     headers: Mapping[str, str]  # header names are all lower case

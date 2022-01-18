@@ -10,7 +10,7 @@ import pymysql
 from blspy import G1Element
 from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.types.coin_solution import CoinSolution
+from chia.types.coin_solution import CoinSpend
 from chia.util.ints import uint64
 
 from .abstract import AbstractPoolStore
@@ -21,29 +21,31 @@ pymysql.converters.encoders[uint64] = pymysql.converters.escape_int
 pymysql.converters.conversions = pymysql.converters.encoders.copy()
 pymysql.converters.conversions.update(pymysql.converters.decoders)
 
+
 class MariadbPoolStore(AbstractPoolStore):
     """
     Pool store based on MariaDB.
     """
+
     async def connect(self):
         try:
-            #initialize logging 
+            # initialize logging
             self.log = logging
-            #load config 
+            # load config
             with open(os.getcwd() + "/config.yaml") as f:
                 config: Dict = yaml.safe_load(f)
             self.pool = await aiomysql.create_pool(
-            minsize=1, 
-            maxsize=12,
-            host=config["db_host"],
-            port=config["db_port"],
-            user=config["db_user"],
-            password=config["db_password"],
-            db=config["db_name"],
+                minsize=1,
+                maxsize=12,
+                host=config["db_host"],
+                port=config["db_port"],
+                user=config["db_user"],
+                password=config["db_password"],
+                db=config["db_name"],
             )
         except pymysql.err.OperationalError as e:
-                self.log.error("Error In Database Config. Check your config file! %s", e)
-                raise ConnectionError('Unable to Connect to SQL Database.')
+            self.log.error("Error In Database Config. Check your config file! %s", e)
+            raise ConnectionError("Unable to Connect to SQL Database.")
         self.connection = await self.pool.acquire()
         self.cursor = await self.connection.cursor()
         await self.cursor.execute(
@@ -74,7 +76,6 @@ class MariadbPoolStore(AbstractPoolStore):
         await self.cursor.execute("CREATE INDEX IF NOT EXISTS launcher_id_index on partial(launcher_id)")
         await self.connection.commit()
         self.pool.release(self.connection)
-        
 
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:
@@ -84,7 +85,7 @@ class MariadbPoolStore(AbstractPoolStore):
             row[2],
             bytes.fromhex(row[3]),
             G1Element.from_bytes(bytes.fromhex(row[4])),
-            CoinSolution.from_bytes(row[5]),
+            CoinSpend.from_bytes(row[5]),
             PoolState.from_bytes(row[6]),
             row[7],
             row[8],
@@ -96,9 +97,9 @@ class MariadbPoolStore(AbstractPoolStore):
         with (await self.pool) as connection:
             cursor = await connection.cursor()
             await cursor.execute(
-                f"INSERT INTO farmer VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) " 
+                f"INSERT INTO farmer VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
                 f"ON DUPLICATE KEY UPDATE p2_singleton_puzzle_hash=%s, delay_time=%s, delay_puzzle_hash=%s,"
-                f"authentication_public_key=%s, singleton_tip=%s, singleton_tip_state=%s, payout_instructions=%s, " 
+                f"authentication_public_key=%s, singleton_tip=%s, singleton_tip_state=%s, payout_instructions=%s, "
                 f"is_pool_member=%s",
                 (
                     farmer_record.launcher_id.hex(),
@@ -129,7 +130,8 @@ class MariadbPoolStore(AbstractPoolStore):
         with (await self.pool) as connection:
             cursor = await connection.cursor()
             await cursor.execute(
-                f"SELECT * FROM farmer WHERE launcher_id=%s",(launcher_id.hex(),),
+                f"SELECT * FROM farmer WHERE launcher_id=%s",
+                (launcher_id.hex(),),
             )
             row = await cursor.fetchone()
             if row is None:
@@ -144,12 +146,11 @@ class MariadbPoolStore(AbstractPoolStore):
                 f"UPDATE farmer SET difficulty=%s WHERE launcher_id=%s", (difficulty, launcher_id.hex())
             )
             await connection.commit()
-        
 
     async def update_singleton(
         self,
         launcher_id: bytes32,
-        singleton_tip: CoinSolution,
+        singleton_tip: CoinSpend,
         singleton_tip_state: PoolState,
         is_pool_member: bool,
     ):
@@ -171,7 +172,7 @@ class MariadbPoolStore(AbstractPoolStore):
 
             all_phs: Set[bytes32] = set()
             for row in rows:
-              all_phs.add(bytes32(bytes.fromhex(row[0])))
+                all_phs.add(bytes32(bytes.fromhex(row[0])))
             return all_phs
 
     async def get_farmer_records_for_p2_singleton_phs(self, puzzle_hashes: Set[bytes32]) -> List[FarmerRecord]:
@@ -215,11 +216,12 @@ class MariadbPoolStore(AbstractPoolStore):
             await cursor.close()
             await connection.commit()
 
-
     async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
         with (await self.pool) as connection:
             cursor = await connection.cursor()
-            await cursor.execute("INSERT INTO partial VALUES(%s, %s, %s)",(launcher_id.hex(), timestamp, difficulty),
+            await cursor.execute(
+                "INSERT INTO partial VALUES(%s, %s, %s)",
+                (launcher_id.hex(), timestamp, difficulty),
             )
             await connection.commit()
         with (await self.pool) as connection:
@@ -238,6 +240,7 @@ class MariadbPoolStore(AbstractPoolStore):
                 (launcher_id.hex(), count),
             )
             rows = await cursor.fetchall()
-            ret: List[Tuple[uint64, uint64]] = [(uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows]
+            ret: List[Tuple[uint64, uint64]] = [
+                (uint64(timestamp), uint64(difficulty)) for timestamp, difficulty in rows
+            ]
             return ret
-        

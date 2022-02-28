@@ -195,7 +195,7 @@ class Pool:
             self.config["self_hostname"], uint16(self.wallet_rpc_port), DEFAULT_ROOT_PATH, self.config
         )
         self.blockchain_state = await self.node_rpc_client.get_blockchain_state()
-        res = await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
+        res = await self.wallet_rpc_client.log_in(fingerprint=self.wallet_fingerprint)
         if not res["success"]:
             raise ValueError(f"Error logging in: {res['error']}. Make sure your config fingerprint is correct.")
         self.log.info(f"Logging in: {res}")
@@ -444,7 +444,7 @@ class Pool:
         while True:
             try:
                 peak_height = self.blockchain_state["peak"].height
-                await self.wallet_rpc_client.log_in_and_skip(fingerprint=self.wallet_fingerprint)
+                await self.wallet_rpc_client.log_in(fingerprint=self.wallet_fingerprint)
                 if not self.blockchain_state["sync"]["synced"] or not self.wallet_synced:
                     self.log.warning("Waiting for wallet sync")
                     await asyncio.sleep(60)

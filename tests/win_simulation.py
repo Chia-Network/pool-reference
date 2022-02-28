@@ -7,7 +7,7 @@ from chia.consensus.pot_iterations import calculate_iterations_quality
 # This is the sub slot iters that all pools must use to base the difficulty on. A difficulty of 1 (the minimum)
 # targets about 10 proofs per day for one plot of size k32. There are 9216 signage points per day, 64 signage points
 # per slot, the difficulty constant factor is 2**67, the plot filter is 512
-ssi = (2 ** 67 / (_expected_plot_size(32)) / 9216) * 64 * 10 * 512
+ssi = (2**67 / (_expected_plot_size(32)) / 9216) * 64 * 10 * 512
 
 print(f"SSi {ssi}")
 # We use 37.6 billion as an approximation and a number that is easier to remember
@@ -20,7 +20,7 @@ def do_simulation(days: int, diff: int, k: int, num: int):
         for j in range(num):
             # Plot filter
             if random.random() < (1.0 / 512.0):
-                s = calculate_iterations_quality(2 ** 67, token_bytes(32), k, diff, token_bytes(32)) < (ssi // 64)
+                s = calculate_iterations_quality(2**67, token_bytes(32), k, diff, token_bytes(32)) < (ssi // 64)
                 if s:
                     successes += 1
     return successes

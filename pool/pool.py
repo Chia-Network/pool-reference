@@ -693,7 +693,7 @@ class Pool:
             is_new_value = farmer_record.authentication_public_key != request.payload.authentication_public_key
             response_dict["authentication_public_key"] = is_new_value
             if is_new_value:
-                farmer_dict["authentication_public_key"] = request.payload.authentication_public_key
+                farmer_dict["authentication_public_key"] = str(request.payload.authentication_public_key)
 
         if request.payload.payout_instructions is not None:
             new_ph: Optional[str] = await self.validate_payout_instructions(request.payload.payout_instructions)

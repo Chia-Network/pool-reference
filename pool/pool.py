@@ -688,7 +688,7 @@ class Pool:
             return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
         farmer_dict = farmer_record.to_json_dict()
-        response_dict = {}
+        response_dict: Dict[str, bool] = {}
         if request.payload.authentication_public_key is not None:
             is_new_value = farmer_record.authentication_public_key != request.payload.authentication_public_key
             response_dict["authentication_public_key"] = is_new_value
@@ -697,8 +697,10 @@ class Pool:
 
         if request.payload.payout_instructions is not None:
             new_ph: Optional[str] = await self.validate_payout_instructions(request.payload.payout_instructions)
-            response_dict["payout_instructions"] = new_ph
-            if new_ph:
+            if new_ph is None:
+                return error_dict(PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS, "Failed to validate payout instructions.")
+            response_dict["payout_instructions"] = new_ph != farmer_record.payout_instructions
+            if response_dict["payout_instructions"]:
                 farmer_dict["payout_instructions"] = new_ph
 
         if request.payload.suggested_difficulty is not None:

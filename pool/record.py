@@ -8,8 +8,8 @@ from chia.util.ints import uint64
 from chia.util.streamable import streamable, Streamable
 
 
-@dataclass(frozen=True)
 @streamable
+@dataclass(frozen=True)
 class FarmerRecord(Streamable):
     launcher_id: bytes32  # This uniquely identifies the singleton on the blockchain (ID for this farmer)
     p2_singleton_puzzle_hash: bytes32  # Derived from the launcher id, delay_time and delay_puzzle_hash

@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import logging
 import pathlib
 import time
@@ -687,38 +688,48 @@ class Pool:
         if not AugSchemeMPL.verify(last_state.owner_pubkey, request.payload.get_hash(), request.signature):
             return error_dict(PoolErrorCode.INVALID_SIGNATURE, f"Invalid signature")
 
-        farmer_dict = farmer_record.to_json_dict()
-        response_dict = {}
+        updated_record: FarmerRecord = dataclasses.replace(farmer_record)
+        response_dict: Dict[str, bool] = {}
         if request.payload.authentication_public_key is not None:
             is_new_value = farmer_record.authentication_public_key != request.payload.authentication_public_key
             response_dict["authentication_public_key"] = is_new_value
             if is_new_value:
-                farmer_dict["authentication_public_key"] = request.payload.authentication_public_key
+                updated_record = dataclasses.replace(
+                    updated_record, authentication_public_key=request.payload.authentication_public_key
+                )
 
         if request.payload.payout_instructions is not None:
             new_ph: Optional[str] = await self.validate_payout_instructions(request.payload.payout_instructions)
-            response_dict["payout_instructions"] = new_ph
-            if new_ph:
-                farmer_dict["payout_instructions"] = new_ph
+            if new_ph is None:
+                return error_dict(PoolErrorCode.INVALID_PAYOUT_INSTRUCTIONS, "Failed to validate payout instructions.")
+
+            response_dict["payout_instructions"] = farmer_record.payout_instructions != new_ph
+            if response_dict["payout_instructions"]:
+                updated_record = dataclasses.replace(updated_record, payout_instructions=new_ph)
+
+        if updated_record != farmer_record:
+            self.log.info(f"Update farmer record to {updated_record}")
+            await self.store.add_farmer_record(updated_record, metadata)
+
+        async def update_difficulty_later():
+            await asyncio.sleep(self.farmer_update_cooldown_seconds)
+            await self.store.update_difficulty(launcher_id, request.payload.suggested_difficulty)
+            self.farmer_update_blocked.remove(launcher_id)
+            self.log.info(
+                f"Updated difficulty for {launcher_id}:"
+                f"{self.farmer_update_cooldown_seconds}s delayed to {request.payload.suggested_difficulty}"
+            )
 
         if request.payload.suggested_difficulty is not None:
             is_new_value = (
-                farmer_record.difficulty != request.payload.suggested_difficulty
+                updated_record.difficulty != request.payload.suggested_difficulty
                 and request.payload.suggested_difficulty is not None
                 and request.payload.suggested_difficulty >= self.min_difficulty
             )
             response_dict["suggested_difficulty"] = is_new_value
             if is_new_value:
-                farmer_dict["difficulty"] = request.payload.suggested_difficulty
-
-        async def update_farmer_later():
-            await asyncio.sleep(self.farmer_update_cooldown_seconds)
-            await self.store.add_farmer_record(FarmerRecord.from_json_dict(farmer_dict), metadata)
-            self.farmer_update_blocked.remove(launcher_id)
-            self.log.info(f"Updated farmer: {response_dict}")
-
-        self.farmer_update_blocked.add(launcher_id)
-        asyncio.create_task(update_farmer_later())
+                self.farmer_update_blocked.add(launcher_id)
+                asyncio.create_task(update_difficulty_later())
 
         # TODO Fix chia-blockchain's Streamable implementation to support Optional in `from_json_dict`, then use
         # PutFarmerResponse here and in the trace up.

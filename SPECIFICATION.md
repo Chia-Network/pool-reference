@@ -170,7 +170,7 @@ Request parameter:
 
 Example request:
 ```
-https://poolurl.com/farmer/launcher_id=:launcher_id&authentication_token=:token&signature=:signature
+https://poolurl.com/farmer?launcher_id=:launcher_id&authentication_token=:token&signature=:signature
 ```
 
 Successful response:

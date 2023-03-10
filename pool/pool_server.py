@@ -61,7 +61,6 @@ def get_ssl_context(config):
 
 class PoolServer:
     def __init__(self, config: Dict, constants: ConsensusConstants, pool_store: Optional[AbstractPoolStore] = None):
-
         # We load our configurations from here
         with open(os.getcwd() + "/config.yaml") as f:
             pool_config: Dict = yaml.safe_load(f)

@@ -8,7 +8,6 @@ from pool.difficulty_adjustment import get_new_difficulty
 
 class TestDifficulty(unittest.TestCase):
     def test_no_things_in_db(self):
-
         time_target = 24 * 3600
         current_time = uint64(time.time())
         assert get_new_difficulty([], 300, time_target, 10, current_time, 1) == 10

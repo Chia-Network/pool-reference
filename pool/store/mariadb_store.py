@@ -1,10 +1,8 @@
 import os
 import yaml
 import logging
-from pathlib import Path
 from typing import Optional, Set, List, Tuple, Dict
 
-import asyncio
 import aiomysql
 import pymysql
 from blspy import G1Element
@@ -94,7 +92,7 @@ class MariadbPoolStore(AbstractPoolStore):
         )
 
     async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(
                 f"INSERT INTO farmer VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
@@ -127,7 +125,7 @@ class MariadbPoolStore(AbstractPoolStore):
 
     async def get_farmer_record(self, launcher_id: bytes32) -> Optional[FarmerRecord]:
         # TODO(pool): use cache
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(
                 f"SELECT * FROM farmer WHERE launcher_id=%s",
@@ -139,7 +137,7 @@ class MariadbPoolStore(AbstractPoolStore):
             return self._row_to_farmer_record(row)
 
     async def update_difficulty(self, launcher_id: bytes32, difficulty: uint64):
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             connection = await self.pool.acquire()
             cursor = await connection.cursor()
             await cursor.execute(
@@ -155,7 +153,7 @@ class MariadbPoolStore(AbstractPoolStore):
         is_pool_member: bool,
     ):
         entry = (bytes(singleton_tip), bytes(singleton_tip_state), int(is_pool_member), launcher_id.hex())
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(
                 f"UPDATE farmer SET singleton_tip=%s, singleton_tip_state=%s, is_pool_member=%s WHERE launcher_id=%s",
@@ -164,7 +162,7 @@ class MariadbPoolStore(AbstractPoolStore):
             await connection.commit()
 
     async def get_pay_to_singleton_phs(self) -> Set[bytes32]:
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute("SELECT p2_singleton_puzzle_hash from farmer")
             rows = await cursor.fetchall()
@@ -179,7 +177,7 @@ class MariadbPoolStore(AbstractPoolStore):
         if len(puzzle_hashes) == 0:
             return []
         puzzle_hashes_db = tuple([ph.hex() for ph in list(puzzle_hashes)])
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(
                 f'SELECT * from farmer WHERE p2_singleton_puzzle_hash in ({"%s," * (len(puzzle_hashes_db) - 1)}%s) ',
@@ -190,7 +188,7 @@ class MariadbPoolStore(AbstractPoolStore):
             return [self._row_to_farmer_record(row) for row in rows]
 
     async def get_farmer_points_and_payout_instructions(self) -> List[Tuple[uint64, bytes]]:
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(f"SELECT points, payout_instructions FROM farmer")
             rows = await cursor.fetchall()
@@ -210,21 +208,21 @@ class MariadbPoolStore(AbstractPoolStore):
             return ret
 
     async def clear_farmer_points(self) -> None:
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(f"UPDATE farmer SET points=0")
             await cursor.close()
             await connection.commit()
 
     async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(
                 "INSERT INTO partial VALUES(%s, %s, %s)",
                 (launcher_id.hex(), timestamp, difficulty),
             )
             await connection.commit()
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(
                 f"UPDATE farmer SET points=points+%s WHERE launcher_id=%s", (difficulty, launcher_id.hex())
@@ -233,7 +231,7 @@ class MariadbPoolStore(AbstractPoolStore):
             await cursor.close()
 
     async def get_recent_partials(self, launcher_id: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
-        with (await self.pool) as connection:
+        with await self.pool as connection:
             cursor = await connection.cursor()
             await cursor.execute(
                 "SELECT timestamp, difficulty from partial WHERE launcher_id=%s ORDER BY timestamp DESC LIMIT %s",

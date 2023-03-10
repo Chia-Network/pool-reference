@@ -26,7 +26,6 @@ from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.proof_of_space import verify_and_get_quality_string
 from chia.types.coin_record import CoinRecord
 from chia.types.coin_spend import CoinSpend
-from chia.types.spend_bundle import SpendBundle
 from chia.util.bech32m import decode_puzzle_hash
 from chia.consensus.constants import ConsensusConstants
 from chia.util.ints import uint8, uint16, uint32, uint64

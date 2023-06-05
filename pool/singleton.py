@@ -171,6 +171,8 @@ async def create_absorb_transaction(
 
     all_spends: List[CoinSpend] = []
     for reward_coin_record in reward_coin_records:
+        if len(all_spends) == 50:
+            break
         found_block_index: Optional[uint32] = get_farmed_height(reward_coin_record, genesis_challenge)
         if not found_block_index:
             # The puzzle does not allow spending coins that are not a coinbase reward

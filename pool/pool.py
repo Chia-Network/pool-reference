@@ -6,51 +6,51 @@ import time
 import traceback
 from asyncio import Task
 from math import floor
-from typing import Dict, Optional, Set, List, Tuple, Callable
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from blspy import AugSchemeMPL, G1Element
 from chia.consensus.block_rewards import calculate_pool_reward
-from chia.pools.pool_wallet_info import PoolState, PoolSingletonState
+from chia.consensus.constants import ConsensusConstants
+from chia.consensus.pot_iterations import calculate_iterations_quality
+from chia.full_node.signage_point import SignagePoint
+from chia.pools.pool_puzzles import (
+    get_delayed_puz_info_from_launcher_spend,
+    get_most_recent_singleton_coin_from_coin_spend,
+    launcher_id_to_p2_puzzle_hash,
+)
+from chia.pools.pool_wallet_info import PoolSingletonState, PoolState
 from chia.protocols.pool_protocol import (
+    POOL_PROTOCOL_VERSION,
     PoolErrorCode,
-    PostPartialRequest,
-    PostPartialResponse,
     PostFarmerRequest,
     PostFarmerResponse,
+    PostPartialRequest,
+    PostPartialResponse,
     PutFarmerRequest,
     PutFarmerResponse,
-    POOL_PROTOCOL_VERSION,
 )
+from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.rpc.wallet_rpc_client import WalletRpcClient
 from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.proof_of_space import verify_and_get_quality_string
+from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_record import CoinRecord
 from chia.types.coin_spend import CoinSpend
-from chia.util.bech32m import decode_puzzle_hash
-from chia.consensus.constants import ConsensusConstants
-from chia.util.ints import uint8, uint16, uint32, uint64
-from chia.util.byte_types import hexstr_to_bytes
-from chia.util.default_root import DEFAULT_ROOT_PATH
-from chia.rpc.full_node_rpc_client import FullNodeRpcClient
-from chia.full_node.signage_point import SignagePoint
 from chia.types.end_of_slot_bundle import EndOfSubSlotBundle
-from chia.types.blockchain_format.sized_bytes import bytes32
-from chia.consensus.pot_iterations import calculate_iterations_quality
-from chia.util.lru_cache import LRUCache
+from chia.util.bech32m import decode_puzzle_hash
+from chia.util.byte_types import hexstr_to_bytes
 from chia.util.chia_logging import initialize_logging
+from chia.util.default_root import DEFAULT_ROOT_PATH
+from chia.util.ints import uint8, uint16, uint32, uint64
+from chia.util.lru_cache import LRUCache
 from chia.wallet.transaction_record import TransactionRecord
-from chia.pools.pool_puzzles import (
-    get_most_recent_singleton_coin_from_coin_spend,
-    get_delayed_puz_info_from_launcher_spend,
-    launcher_id_to_p2_puzzle_hash,
-)
 
 from .difficulty_adjustment import get_new_difficulty
-from .singleton import create_absorb_transaction, get_singleton_state, get_coin_spend, get_farmed_height
+from .record import FarmerRecord
+from .singleton import create_absorb_transaction, get_coin_spend, get_farmed_height, get_singleton_state
 from .store.abstract import AbstractPoolStore
 from .store.sqlite_store import SqlitePoolStore
-from .record import FarmerRecord
-from .util import error_dict, RequestMetadata
+from .util import RequestMetadata, error_dict
 
 
 class Pool:

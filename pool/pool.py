@@ -841,6 +841,7 @@ class Pool:
         partial: PostPartialRequest,
         farmer_record: FarmerRecord,
         time_received_partial: uint64,
+        peak_height: uint32,
     ) -> Dict:
         # Validate signatures
         message: bytes32 = partial.payload.get_hash()
@@ -898,8 +899,13 @@ class Pool:
             assert end_of_sub_slot.challenge_chain
             challenge_hash = end_of_sub_slot.challenge_chain.get_hash()
 
+        # Note the use of peak_height + 1. We Are evaluating the suitability for the next block
         quality_string: Optional[bytes32] = verify_and_get_quality_string(
-            partial.payload.proof_of_space, self.constants, challenge_hash, partial.payload.sp_hash
+            partial.payload.proof_of_space,
+            self.constants,
+            challenge_hash,
+            partial.payload.sp_hash,
+            height=uint32(peak_height + 1),
         )
         if quality_string is None:
             return error_dict(PoolErrorCode.INVALID_PROOF, f"Invalid proof of space {partial.payload.sp_hash}")

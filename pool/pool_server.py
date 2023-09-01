@@ -228,7 +228,11 @@ class PoolServer:
                 f"Farmer with launcher_id {partial.payload.launcher_id.hex()} not known.",
             )
 
-            post_partial_response = await self.pool.process_partial(partial, farmer_record, uint64(int(start_time)))
+        peak_height = self.pool.blockchain_state["peak"].height
+        # Note the use of peak_height + 1. We Are evaluating the suitability for the next block
+        post_partial_response = await self.pool.process_partial(
+            partial, farmer_record, uint64(int(start_time)), peak_height + 1
+        )
 
         self.pool.log.info(
             f"post_partial response {post_partial_response}, time: {time.time() - start_time} "

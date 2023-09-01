@@ -4,37 +4,37 @@ import os
 import ssl
 import time
 import traceback
-from typing import Dict, Callable, Optional
+from typing import Callable, Dict, Optional, Union
 
 import aiohttp
 import yaml
-from blspy import AugSchemeMPL, G2Element
 from aiohttp import web
+from blspy import AugSchemeMPL, G2Element
+from chia.consensus.constants import ConsensusConstants
+from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.protocols.pool_protocol import (
-    PoolErrorCode,
-    GetFarmerResponse,
-    GetPoolInfoResponse,
-    PostPartialRequest,
-    PostFarmerRequest,
-    PutFarmerRequest,
-    validate_authentication_token,
     POOL_PROTOCOL_VERSION,
     AuthenticationPayload,
+    GetFarmerResponse,
+    GetPoolInfoResponse,
+    PoolErrorCode,
+    PostFarmerRequest,
+    PostPartialRequest,
+    PutFarmerRequest,
+    validate_authentication_token,
 )
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.byte_types import hexstr_to_bytes
-from chia.util.hash import std_hash
-from chia.consensus.default_constants import DEFAULT_CONSTANTS
-from chia.consensus.constants import ConsensusConstants
-from chia.util.json_util import obj_to_response
-from chia.util.ints import uint8, uint64, uint32
-from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.config import load_config
+from chia.util.default_root import DEFAULT_ROOT_PATH
+from chia.util.hash import std_hash
+from chia.util.ints import uint8, uint32, uint64
+from chia.util.json_util import obj_to_response
 
-from .record import FarmerRecord
 from .pool import Pool
+from .record import FarmerRecord
 from .store.abstract import AbstractPoolStore
-from .util import error_response, RequestMetadata
+from .util import RequestMetadata, error_response
 
 
 def allow_cors(response: web.Response) -> web.Response:
@@ -116,7 +116,7 @@ class PoolServer:
 
     async def get_farmer(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
-        launcher_id: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
+        launcher_id: bytes32 = bytes32(hexstr_to_bytes(request_obj.rel_url.query["launcher_id"]))
         authentication_token = uint64(request_obj.rel_url.query["authentication_token"])
 
         authentication_token_error: Optional[web.Response] = check_authentication_token(
@@ -228,7 +228,7 @@ class PoolServer:
                 f"Farmer with launcher_id {partial.payload.launcher_id.hex()} not known.",
             )
 
-        post_partial_response = await self.pool.process_partial(partial, farmer_record, uint64(int(start_time)))
+            post_partial_response = await self.pool.process_partial(partial, farmer_record, uint64(int(start_time)))
 
         self.pool.log.info(
             f"post_partial response {post_partial_response}, time: {time.time() - start_time} "
@@ -238,7 +238,7 @@ class PoolServer:
 
     async def get_login(self, request_obj) -> web.Response:
         # TODO(pool): add rate limiting
-        launcher_id: bytes32 = hexstr_to_bytes(request_obj.rel_url.query["launcher_id"])
+        launcher_id: bytes32 = bytes32(hexstr_to_bytes(request_obj.rel_url.query["launcher_id"]))
         authentication_token: uint64 = uint64(request_obj.rel_url.query["authentication_token"])
         authentication_token_error = check_authentication_token(
             launcher_id, authentication_token, self.pool.authentication_token_timeout
@@ -267,9 +267,9 @@ class PoolServer:
 
         return await self.login_response(launcher_id)
 
-    async def login_response(self, launcher_id):
+    async def login_response(self, launcher_id) -> web.Response:
         record: Optional[FarmerRecord] = await self.pool.store.get_farmer_record(launcher_id)
-        response = {}
+        response: Dict[str, Union[FarmerRecord, list[tuple[uint64, uint64]]]] = {}
         if record is not None:
             response["farmer_record"] = record
             recent_partials = await self.pool.store.get_recent_partials(launcher_id, 20)

@@ -1,15 +1,15 @@
-from typing import List, Optional, Tuple
 import logging
+from typing import List, Optional, Tuple
 
 from blspy import G2Element
 from chia.consensus.coinbase import pool_parent_id
 from chia.pools.pool_puzzles import (
     create_absorb_spend,
-    solution_to_pool_state,
-    get_most_recent_singleton_coin_from_coin_spend,
-    pool_state_to_inner_puzzle,
     create_full_puzzle,
     get_delayed_puz_info_from_launcher_spend,
+    get_most_recent_singleton_coin_from_coin_spend,
+    pool_state_to_inner_puzzle,
+    solution_to_pool_state,
 )
 from chia.pools.pool_wallet import PoolSingletonState
 from chia.pools.pool_wallet_info import PoolState
@@ -24,7 +24,6 @@ from chia.types.coin_spend import CoinSpend
 from chia.types.spend_bundle import SpendBundle
 from chia.util.ints import uint32, uint64
 from chia.wallet.transaction_record import TransactionRecord
-
 
 from .record import FarmerRecord
 
@@ -59,6 +58,7 @@ async def get_singleton_state(
     confirmation_security_threshold: int,
     genesis_challenge: bytes32,
 ) -> Optional[Tuple[CoinSpend, PoolState, PoolState]]:
+    last_spend: Optional[CoinSpend]
     try:
         if farmer_record is None:
             launcher_coin: Optional[CoinRecord] = await node_rpc_client.get_coin_record_by_name(launcher_id)
@@ -69,10 +69,16 @@ async def get_singleton_state(
                 log.warning(f"Genesis coin {launcher_id} not spent")
                 return None
 
-            last_spend: Optional[CoinSpend] = await get_coin_spend(node_rpc_client, launcher_coin)
+            last_spend = await get_coin_spend(node_rpc_client, launcher_coin)
+            if last_spend is None:
+                raise RuntimeError(
+                    f"Failed to get_coin_spend from {node_rpc_client.hostname}:{node_rpc_client.port}"
+                    f" for singleton {launcher_coin}"
+                )
             delay_time, delay_puzzle_hash = get_delayed_puz_info_from_launcher_spend(last_spend)
             saved_state = solution_to_pool_state(last_spend)
-            assert last_spend is not None and saved_state is not None
+            if saved_state is None:
+                raise RuntimeError(f"solution_to_pool_state failed to get state for spend {last_spend}")
         else:
             last_spend = farmer_record.singleton_tip
             saved_state = farmer_record.singleton_tip_state
@@ -108,7 +114,7 @@ async def get_singleton_state(
                     return None
                 break
 
-            last_spend: Optional[CoinSpend] = await get_coin_spend(node_rpc_client, next_coin_record)
+            last_spend = await get_coin_spend(node_rpc_client, next_coin_record)
             assert last_spend is not None
 
             pool_state: Optional[PoolState] = solution_to_pool_state(last_spend)
@@ -145,7 +151,7 @@ async def create_absorb_transaction(
     peak_height: uint32,
     reward_coin_records: List[CoinRecord],
     genesis_challenge: bytes32,
-    fee_amount: Optional[uint64] = None,
+    fee_amount: uint64 = uint64(0),
     wallet_rpc_client: Optional[WalletRpcClient] = None,
     fee_target_puzzle_hash: Optional[bytes32] = None,
 ) -> Optional[SpendBundle]:
@@ -193,6 +199,7 @@ async def create_absorb_transaction(
 
     if len(coin_announcements) > 0:
         # address can be anything
+        assert wallet_rpc_client
         signed_transaction: TransactionRecord = await wallet_rpc_client.create_signed_transaction(
             additions=[{"amount": uint64(1), "puzzle_hash": fee_target_puzzle_hash}],
             fee=uint64(fee_amount * len(coin_announcements)),

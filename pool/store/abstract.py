@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
 import asyncio
-from typing import Optional, Set, List, Tuple
+from abc import ABC, abstractmethod
+from typing import List, Optional, Set, Tuple
 
 from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32

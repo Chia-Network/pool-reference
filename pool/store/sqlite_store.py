@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional, Set, List, Tuple, Dict
+from typing import Dict, List, Optional, Set, Tuple
 
 import aiosqlite
 from blspy import G1Element
@@ -8,9 +10,9 @@ from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_spend import CoinSpend
 from chia.util.ints import uint64
 
-from .abstract import AbstractPoolStore
 from ..record import FarmerRecord
 from ..util import RequestMetadata
+from .abstract import AbstractPoolStore
 
 
 class SqlitePoolStore(AbstractPoolStore):
@@ -57,10 +59,10 @@ class SqlitePoolStore(AbstractPoolStore):
     @staticmethod
     def _row_to_farmer_record(row) -> FarmerRecord:
         return FarmerRecord(
-            bytes.fromhex(row[0]),
-            bytes.fromhex(row[1]),
+            bytes32(bytes.fromhex(row[0])),
+            bytes32(bytes.fromhex(row[1])),
             row[2],
-            bytes.fromhex(row[3]),
+            bytes32(bytes.fromhex(row[3])),
             G1Element.from_bytes(bytes.fromhex(row[4])),
             CoinSpend.from_bytes(row[5]),
             PoolState.from_bytes(row[6]),
@@ -70,8 +72,9 @@ class SqlitePoolStore(AbstractPoolStore):
             True if row[10] == 1 else False,
         )
 
-    async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata):
+    async def add_farmer_record(self, farmer_record: FarmerRecord, metadata: RequestMetadata) -> None:
         # Find the launcher_id exists.
+        assert self.connection
         cursor = await self.connection.execute(
             "SELECT * from farmer where launcher_id=?",
             (farmer_record.launcher_id.hex(),),
@@ -80,7 +83,7 @@ class SqlitePoolStore(AbstractPoolStore):
         # Insert for None
         if row is None:
             cursor = await self.connection.execute(
-                f"INSERT INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO farmer VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     farmer_record.launcher_id.hex(),
                     farmer_record.p2_singleton_puzzle_hash.hex(),
@@ -98,16 +101,16 @@ class SqlitePoolStore(AbstractPoolStore):
         # update for Exist
         else:
             cursor = await self.connection.execute(
-                f"UPDATE farmer SET "
-                f"p2_singleton_puzzle_hash=?, "
-                f"delay_time=?, "
-                f"delay_puzzle_hash=?, "
-                f"authentication_public_key=?, "
-                f"singleton_tip=?, "
-                f"singleton_tip_state=?, "
-                f"payout_instructions=?, "
-                f"is_pool_member=? "
-                f"WHERE launcher_id=?",
+                "UPDATE farmer SET "
+                "p2_singleton_puzzle_hash=?, "
+                "delay_time=?, "
+                "delay_puzzle_hash=?, "
+                "authentication_public_key=?, "
+                "singleton_tip=?, "
+                "singleton_tip_state=?, "
+                "payout_instructions=?, "
+                "is_pool_member=? "
+                "WHERE launcher_id=?",
                 (
                     farmer_record.p2_singleton_puzzle_hash.hex(),
                     farmer_record.delay_time,
@@ -125,6 +128,7 @@ class SqlitePoolStore(AbstractPoolStore):
 
     async def get_farmer_record(self, launcher_id: bytes32) -> Optional[FarmerRecord]:
         # TODO(pool): use cache
+        assert self.connection
         cursor = await self.connection.execute(
             "SELECT * from farmer where launcher_id=?",
             (launcher_id.hex(),),
@@ -136,8 +140,9 @@ class SqlitePoolStore(AbstractPoolStore):
         return self._row_to_farmer_record(row)
 
     async def update_difficulty(self, launcher_id: bytes32, difficulty: uint64):
+        assert self.connection
         cursor = await self.connection.execute(
-            f"UPDATE farmer SET difficulty=? WHERE launcher_id=?", (difficulty, launcher_id.hex())
+            "UPDATE farmer SET difficulty=? WHERE launcher_id=?", (difficulty, launcher_id.hex())
         )
         await cursor.close()
         await self.connection.commit()
@@ -149,15 +154,17 @@ class SqlitePoolStore(AbstractPoolStore):
         singleton_tip_state: PoolState,
         is_pool_member: bool,
     ):
+        assert self.connection
         entry = (bytes(singleton_tip), bytes(singleton_tip_state), int(is_pool_member), launcher_id.hex())
         cursor = await self.connection.execute(
-            f"UPDATE farmer SET singleton_tip=?, singleton_tip_state=?, is_pool_member=? WHERE launcher_id=?",
+            "UPDATE farmer SET singleton_tip=?, singleton_tip_state=?, is_pool_member=? WHERE launcher_id=?",
             entry,
         )
         await cursor.close()
         await self.connection.commit()
 
     async def get_pay_to_singleton_phs(self) -> Set[bytes32]:
+        assert self.connection
         cursor = await self.connection.execute("SELECT p2_singleton_puzzle_hash from farmer")
         rows = await cursor.fetchall()
         await cursor.close()
@@ -170,6 +177,7 @@ class SqlitePoolStore(AbstractPoolStore):
     async def get_farmer_records_for_p2_singleton_phs(self, puzzle_hashes: Set[bytes32]) -> List[FarmerRecord]:
         if len(puzzle_hashes) == 0:
             return []
+        assert self.connection
         puzzle_hashes_db = tuple([ph.hex() for ph in list(puzzle_hashes)])
         cursor = await self.connection.execute(
             f'SELECT * from farmer WHERE p2_singleton_puzzle_hash in ({"?," * (len(puzzle_hashes_db) - 1)}?) ',
@@ -180,7 +188,8 @@ class SqlitePoolStore(AbstractPoolStore):
         return [self._row_to_farmer_record(row) for row in rows]
 
     async def get_farmer_points_and_payout_instructions(self) -> List[Tuple[uint64, bytes]]:
-        cursor = await self.connection.execute(f"SELECT points, payout_instructions from farmer")
+        assert self.connection
+        cursor = await self.connection.execute("SELECT points, payout_instructions from farmer")
         rows = await cursor.fetchall()
         await cursor.close()
 
@@ -189,33 +198,36 @@ class SqlitePoolStore(AbstractPoolStore):
             points: uint64 = uint64(row[0])
             ph: bytes32 = bytes32(bytes.fromhex(row[1]))
             if ph in accumulated:
-                accumulated[ph] += points
+                accumulated[ph] = uint64(accumulated[ph] + points)
             else:
                 accumulated[ph] = points
 
-        ret: List[Tuple[uint64, bytes32]] = []
+        ret: List[Tuple[uint64, bytes]] = []
         for ph, total_points in accumulated.items():
             ret.append((total_points, ph))
         return ret
 
     async def clear_farmer_points(self) -> None:
-        cursor = await self.connection.execute(f"UPDATE farmer set points=0")
+        assert self.connection
+        cursor = await self.connection.execute("UPDATE farmer set points=0")
         await cursor.close()
         await self.connection.commit()
 
     async def add_partial(self, launcher_id: bytes32, timestamp: uint64, difficulty: uint64):
+        assert self.connection
         cursor = await self.connection.execute(
             "INSERT into partial VALUES(?, ?, ?)",
             (launcher_id.hex(), timestamp, difficulty),
         )
         await cursor.close()
         cursor = await self.connection.execute(
-            f"UPDATE farmer SET points=points+? WHERE launcher_id=?", (difficulty, launcher_id.hex())
+            "UPDATE farmer SET points=points+? WHERE launcher_id=?", (difficulty, launcher_id.hex())
         )
         await cursor.close()
         await self.connection.commit()
 
     async def get_recent_partials(self, launcher_id: bytes32, count: int) -> List[Tuple[uint64, uint64]]:
+        assert self.connection
         cursor = await self.connection.execute(
             "SELECT timestamp, difficulty from partial WHERE launcher_id=? ORDER BY timestamp DESC LIMIT ?",
             (launcher_id.hex(), count),

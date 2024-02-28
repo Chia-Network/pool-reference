@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, Mapping
 
-from chia.protocols.pool_protocol import PoolErrorCode, ErrorResponse
+from chia.protocols.pool_protocol import ErrorResponse, PoolErrorCode
 from chia.util.ints import uint16
 from chia.util.json_util import obj_to_response
 
@@ -27,7 +27,7 @@ class RequestMetadata:
     headers: Mapping[str, str]  # header names are all lower case
     cookies: Dict[str, str]
     query: Dict[str, str]  # query params passed in the url. These are not used by chia clients at the moment, but
-    # allow for a lot of adjustments and thanks to including them now they can be used without introducing breaking changes
+    # they allow users of this code to extend the protocol without introducing breaking changes
     remote: str  # address of the client making the request
 
     def __post_init__(self):

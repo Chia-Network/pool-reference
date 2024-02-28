@@ -1,4 +1,5 @@
 import os
+import sys
 
 import setuptools
 from setuptools import setup
@@ -12,7 +13,24 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 
-setup(
+dependencies = [
+    "chia-blockchain==2.0.0",
+    "blspy==2.0.2",
+    "setuptools~=56.1.0",
+    "aiosqlite==0.19.0",
+    "aiohttp==3.8.4",
+    "pytest==7.4.0",
+    "PyMySQL==1.1.0",
+]
+
+dev_dependencies = [
+    "types-aiofiles==23.1.0.5",
+    "types-pyyaml==6.0.12.11",
+    "types-setuptools==68.0.0.3",
+    "types-PyMySQL==1.1.0.1",
+]
+
+kwargs = dict(
     name="chia-pool-reference",
     version="1.2",
     author="Mariano Sorgente",
@@ -20,7 +38,10 @@ setup(
     description=("A reference pool for the Chia blockchain."),
     license="Apache",
     packages=setuptools.find_packages(),
-    install_requires=["wheel", "chia-blockchain", "Flask"],
+    install_requires=dependencies,
+    extras_require=dict(
+        dev=dev_dependencies,
+    ),
     long_description=read("README.md"),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -28,3 +49,9 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
 )
+
+if "setup_file" in sys.modules:
+    # include dev deps in regular deps when run in snyk
+    dependencies.extend(dev_dependencies)
+
+setup(**kwargs)  # type: ignore

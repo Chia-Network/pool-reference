@@ -1,0 +1,56 @@
+# This file is managed by the repo-content-updater project. Manual changes here will result in a PR to bring back
+# inline with the upstream template, unless you remove the dependabot managed file property from the repo
+
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: /
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - go
+      - "Changed"
+    reviewers: ["cmmarslender", "starttoaster"]
+    groups:
+      global:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "pip"
+    directory: /
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - python
+      - "Changed"
+    reviewers: ["emlowe", "altendky"]
+
+  - package-ecosystem: "github-actions"
+    directory: /
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - github_actions
+      - "Changed"
+    reviewers: ["cmmarslender", "Starttoaster", "pmaslana"]
+
+  - package-ecosystem: "npm"
+    directory: /
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - javascript
+      - "Changed"
+    reviewers: ["cmmarslender", "emlowe"]

@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import List, Tuple
 
 from chia.util.ints import uint64
 
@@ -27,12 +27,12 @@ def get_new_difficulty(
     # Lower the difficulty if we are really slow since our last partial
     last_timestamp = recent_partials[0][0]
     if current_time - last_timestamp > 3 * 3600:
-        return max(min_difficulty, current_difficulty // 5)
+        return uint64(max(min_difficulty, current_difficulty // 5))
 
     if current_time - last_timestamp > 3600:
-        return max(min_difficulty, uint64(int(current_difficulty // 1.5)))
+        return uint64(max(min_difficulty, uint64(int(current_difficulty // 1.5))))
 
-    time_taken = uint64(recent_partials[0][0] - recent_partials[-1][0])
+    time_taken = (recent_partials[0][0] - recent_partials[-1][0]) * 1.0
 
     # If we don't have enough partials at this difficulty and time between last and
     # 1st partials is below target time, don't update yet
@@ -45,4 +45,4 @@ def get_new_difficulty(
 
     # Finally, this is the standard case of normal farming and slow (or no) growth, adjust to the new difficulty
     new_difficulty = uint64(int(current_difficulty * time_target / time_taken))
-    return max(min_difficulty, new_difficulty)
+    return uint64(max(min_difficulty, new_difficulty))

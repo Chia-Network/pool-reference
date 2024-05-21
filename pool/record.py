@@ -5,7 +5,7 @@ from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_spend import CoinSpend
 from chia.util.ints import uint64
-from chia.util.streamable import streamable, Streamable
+from chia.util.streamable import Streamable, streamable
 
 
 @streamable

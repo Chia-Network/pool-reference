@@ -18,7 +18,7 @@ dependencies = [
     "blspy==2.0.2",
     "setuptools~=56.1.0",
     "aiosqlite==0.19.0",
-    "aiohttp==3.8.4",
+    "aiohttp==3.9.5",
     "pytest==7.4.0",
     "PyMySQL==1.1.0",
 ]

@@ -14,7 +14,7 @@ def read(fname):
 
 
 dependencies = [
-    "chia-blockchain==2.0.0",
+    "chia-blockchain==2.3.0",
     "blspy==2.0.3",
     "setuptools~=56.1.0",
     "aiosqlite==0.20.0",

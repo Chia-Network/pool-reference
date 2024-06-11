@@ -53,7 +53,7 @@ updates:
       - dependencies
       - javascript
       - "Changed"
-    reviewers: ["cmmarslender", "emlowe"]
+    reviewers: ["cmmarslender", "ChiaMineJP"]
 
   - package-ecosystem: cargo
     directory: /

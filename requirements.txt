@@ -1,6 +1,6 @@
 chia-blockchain==2.0.0
 blspy==2.0.3
-setuptools~=67.6.1
+setuptools~=70.3.0
 aiosqlite==0.20.0
 aiohttp==3.9.5
 pytest==8.2.1

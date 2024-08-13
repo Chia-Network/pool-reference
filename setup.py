@@ -14,13 +14,13 @@ def read(fname):
 
 
 dependencies = [
-    "chia-blockchain==2.0.0",
-    "blspy==2.0.2",
+    "chia-blockchain==2.4.2",
     "setuptools~=56.1.0",
-    "aiosqlite==0.19.0",
-    "aiohttp==3.8.4",
-    "pytest==7.4.0",
+    "aiosqlite==0.20.0",
+    "aiohttp==3.9.4",
+    "pytest==8.1.1",
     "PyMySQL==1.1.0",
+    "chia_rs>=0.5.2",
 ]
 
 dev_dependencies = [

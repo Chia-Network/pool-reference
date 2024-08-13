@@ -132,7 +132,7 @@ farmers, and points should be acknowledged and accumulated points returned in th
 
 
 ### Difficulty adjustment algorithm
-This is a simple difficulty adjustment algorithm executed by the pool. The pool can also improve this or change it 
+This is a simple difficulty adjustment algorithm executed by the pool. The pool can also improve this or change it
 however they wish. The farmer can provide their own `suggested_difficulty`, and the pool can decide whether or not
 to update that farmer's difficulty. Be careful to only accept the latest authentication_public_key when setting
 difficulty or pool payout info. The initial reference client and pool do not use the `suggested_difficulty`.
@@ -143,7 +143,7 @@ difficulty or pool payout info. The initial reference client and pool do not use
 - If < 45 minutes:
    - If have < 300 partials at this difficulty, maintain same difficulty
    - Else, multiply the difficulty by (24 * 3600 / (time taken for 300 partials))
-  
+
 The 6 hours is used to handle rare cases where a farmer's storage drops dramatically. The 45 minutes is similar, but
 for less extreme cases. Finally, the last case of < 45 minutes should properly handle users with increasing space,
 or slightly decreasing space. This targets 300 partials per day, but different numbers can be used based on
@@ -158,8 +158,8 @@ latest seen authentication key for that launcher_id.
 ### Install and run (Testnet)
 To run a pool, you must use this along with the main branch of `chia-blockchain`.
 
-1. Checkout the `main` branch of `chia-blockchain`, and install it. Checkout this repo in another directory next to (not inside) `chia-blockchain`.  
-If you want to connect to testnet, use `export CHIA_ROOT=~/.chia/testnet9`, or whichever testnet you want to join, and 
+1. Checkout the `main` branch of `chia-blockchain`, and install it. Checkout this repo in another directory next to (not inside) `chia-blockchain`.
+If you want to connect to testnet, use `export CHIA_ROOT=~/.chia/testnet9`, or whichever testnet you want to join, and
    run `chia configure -t true`. You can also directly use the `pools.testnet9` branch, although this branch will
    be removed in the future (or past).
 
@@ -168,14 +168,14 @@ If you want to connect to testnet, use `export CHIA_ROOT=~/.chia/testnet9`, or w
 3. Change the `wallet_fingerprint` and `wallet_id` in the `config.yaml` config file, using the information from the first
 key you created in step 2. These can be obtained by doing `chia wallet show`.
 
-4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `config.yaml` 
+4. Do `chia keys show` and get the first address for each of the keys created in step 2. Put these into the `config.yaml`
 config file in `default_target_address` and `pool_fee_address` respectively.
-   
-5. Change the `pool_url` in `config.yaml` to point to your external ip or hostname. 
+
+5. Change the `pool_url` in `config.yaml` to point to your external ip or hostname.
    This must match exactly with what the user enters into their UI or CLI, and must start with https://.
-   
-6. Start the node using `chia start farmer`, and log in to a different key (not the two keys created for the pool). 
-This will be referred to as the farmer's key here. Sync up your wallet on testnet for the farmer key. 
+
+6. Start the node using `chia start farmer`, and log in to a different key (not the two keys created for the pool).
+This will be referred to as the farmer's key here. Sync up your wallet on testnet for the farmer key.
 You can log in to a key by running `chia wallet show` and then choosing each wallet in turn, to make them start syncing.
 
 7. Create a venv (different from chia-blockchain) and start the pool server using the following commands:
@@ -195,19 +195,19 @@ INFO:root:Obtaining balance: {'confirmed_wallet_balance': 0, 'max_send_amount': 
 ```
 
 8. Create a pool nft (on the farmer key) by doing `chia plotnft create -s pool -u https://127.0.0.1:80`, or whatever host:port you want
-to use for your pool. Approve it and wait for transaction confirmation. This url must match *exactly* with what the 
+to use for your pool. Approve it and wait for transaction confirmation. This url must match *exactly* with what the
    pool uses.
-   
+
 9. Do `chia plotnft show` to ensure that your plotnft is created. Now start making some plots for this pool nft.
-You can make plots by specifying the -c argument in `chia plots create`. Make sure to *not* use the `-p` argument. The 
+You can make plots by specifying the -c argument in `chia plots create`. Make sure to *not* use the `-p` argument. The
     value you should use for -c is the `P2 singleton address` from `chia plotnft show` output.
  You can start with small k25 plots and see if partials are submitted from the farmer to the pool server. The output
 will be the following in the pool if everything is working:
 ```
 INFO:root:Returning {'new_difficulty': 1963211364}, time: 0.017535686492919922 singleton: 0x1f8dab79a614a82f9834c8f395f5fe195ae020807169b71a10218b9788a7a573
 ```
-    
-Please send a message to @sorgente711 on keybase if you have questions about the 9 steps explained above. All other questions
-should be sent to the #pools channel in keybase. 
 
- 
+Please send a message to @sorgente711 on keybase if you have questions about the 9 steps explained above. All other questions
+should be sent to the #pools channel in keybase.
+
+

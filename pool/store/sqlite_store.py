@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import aiosqlite
-from blspy import G1Element
 from chia.pools.pool_wallet_info import PoolState
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.types.coin_spend import CoinSpend
 from chia.util.ints import uint64
+from chia_rs import G1Element
 
 from ..record import FarmerRecord
 from ..util import RequestMetadata

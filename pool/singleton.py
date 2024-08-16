@@ -15,7 +15,6 @@ from chia.pools.pool_wallet import PoolSingletonState
 from chia.pools.pool_wallet_info import PoolState
 from chia.rpc.full_node_rpc_client import FullNodeRpcClient
 from chia.rpc.wallet_rpc_client import WalletRpcClient
-from chia.types.announcement import Announcement
 from chia.types.blockchain_format.coin import Coin
 from chia.types.blockchain_format.program import Program
 from chia.types.blockchain_format.sized_bytes import bytes32
@@ -23,7 +22,9 @@ from chia.types.coin_record import CoinRecord
 from chia.types.coin_spend import CoinSpend
 from chia.types.spend_bundle import SpendBundle
 from chia.util.ints import uint32, uint64
+from chia.wallet.conditions import AssertCoinAnnouncement, Condition
 from chia.wallet.transaction_record import TransactionRecord
+from chia.wallet.util.tx_config import DEFAULT_TX_CONFIG
 
 from .record import FarmerRecord
 
@@ -173,7 +174,7 @@ async def create_absorb_transaction(
         farmer_record.launcher_id
     )
     assert launcher_coin_record is not None
-    coin_announcements: List[Announcement] = []
+    coin_announcements: Tuple[Condition, ...] = tuple()
 
     all_spends: List[CoinSpend] = []
     for reward_coin_record in reward_coin_records:
@@ -192,7 +193,10 @@ async def create_absorb_transaction(
             farmer_record.delay_puzzle_hash,
         )
         if fee_amount > 0:
-            coin_announcements.append(Announcement(reward_coin_record.coin.name(), b"$"))
+            coin_announcements = (
+                *coin_announcements,
+                AssertCoinAnnouncement(asserted_id=reward_coin_record.coin.name(), asserted_msg=b"$"),
+            )
         last_spend = absorb_spend[0]
         all_spends += absorb_spend
         # TODO(pool): handle the case where the cost exceeds the size of the block
@@ -200,11 +204,14 @@ async def create_absorb_transaction(
     if len(coin_announcements) > 0:
         # address can be anything
         assert wallet_rpc_client
-        signed_transaction: TransactionRecord = await wallet_rpc_client.create_signed_transaction(
-            additions=[{"amount": uint64(1), "puzzle_hash": fee_target_puzzle_hash}],
-            fee=uint64(fee_amount * len(coin_announcements)),
-            coin_announcements=coin_announcements,
-        )
+        signed_transaction: TransactionRecord = (
+            await wallet_rpc_client.create_signed_transactions(
+                additions=[{"amount": uint64(1), "puzzle_hash": fee_target_puzzle_hash}],
+                tx_config=DEFAULT_TX_CONFIG,
+                fee=uint64(fee_amount * len(coin_announcements)),
+                extra_conditions=(*coin_announcements,),
+            )
+        ).signed_tx
         fee_spend_bundle: Optional[SpendBundle] = signed_transaction.spend_bundle
     else:
         fee_spend_bundle = None

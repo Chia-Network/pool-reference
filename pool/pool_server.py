@@ -9,8 +9,7 @@ from typing import Callable, Dict, Optional, Union
 import aiohttp
 import yaml
 from aiohttp import web
-from blspy import AugSchemeMPL, G2Element
-from chia.consensus.constants import ConsensusConstants
+from chia.consensus.constants import ConsensusConstants, replace_str_to_bytes
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
 from chia.protocols.pool_protocol import (
     POOL_PROTOCOL_VERSION,
@@ -30,6 +29,7 @@ from chia.util.default_root import DEFAULT_ROOT_PATH
 from chia.util.hash import std_hash
 from chia.util.ints import uint8, uint32, uint64
 from chia.util.json_util import obj_to_response
+from chia_rs import AugSchemeMPL, G2Element
 
 from .pool import Pool
 from .record import FarmerRecord
@@ -291,7 +291,7 @@ async def start_pool_server(pool_store: Optional[AbstractPoolStore] = None):
     global runner
     config = load_config(DEFAULT_ROOT_PATH, "config.yaml")
     overrides = config["network_overrides"]["constants"][config["selected_network"]]
-    constants: ConsensusConstants = DEFAULT_CONSTANTS.replace_str_to_bytes(**overrides)
+    constants: ConsensusConstants = replace_str_to_bytes(DEFAULT_CONSTANTS, **overrides)
     server = PoolServer(config, constants, pool_store)
     await server.start()
 

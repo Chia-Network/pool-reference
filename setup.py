@@ -26,7 +26,7 @@ dependencies = [
 dev_dependencies = [
     "types-aiofiles==23.1.0.5",
     "types-pyyaml==6.0.12.20240917",
-    "types-setuptools==75.3.0.20241105",
+    "types-setuptools==75.3.0.20241112",
     "types-PyMySQL==1.1.0.20241103",
 ]
 

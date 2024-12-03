@@ -18,7 +18,7 @@ dependencies = [
     "chia_rs>=0.5.2",
     "setuptools~=56.1.0",
     "aiosqlite==0.20.0",
-    "aiohttp==3.9.5",
+    "aiohttp==3.11.9",
     "pytest==8.3.3",
     "PyMySQL==1.1.1",
 ]

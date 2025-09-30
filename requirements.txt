@@ -1,4 +1,4 @@
-chia-blockchain==2.4.4
+chia-blockchain==2.5.6
 blspy==2.0.3
 setuptools~=75.6.0
 aiosqlite==0.20.0

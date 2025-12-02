@@ -5,7 +5,7 @@ Note: the draft specification is in the SPECIFICATION.md file.
 ### Summary
 This repository provides a sample server written in python, which is meant to serve as a basis for a Chia Pool.
 While this is a fully functional implementation, it requires some work in scalability and security to run in production.
-An FAQ is provided here: https://github.com/Chia-Network/chia-blockchain/wiki/Pooling-FAQ
+An FAQ is provided here: [https://github.com/Chia-Network/chia-blockchain/wiki/Pooling-FAQ](https://docs.chia.net/reference-client/farming/pool-farming/#pooling-faq)
 
 
 ### Customizing

@@ -18,13 +18,13 @@ dependencies = [
     "chia_rs>=0.5.2",
     "setuptools>=56.1,<75.7",
     "aiosqlite==0.20.0",
-    "aiohttp==3.13.3",
+    "aiohttp==3.10.4",
     "pytest==8.3.4",
     "PyMySQL==1.1.1",
 ]
 
 dev_dependencies = [
-    "types-aiofiles==24.1.0.20240626",
+    "types-aiofiles==25.1.0.20251011",
     "types-pyyaml==6.0.12.20250915",
     "types-setuptools==75.6.0.20241126",
     "types-PyMySQL==1.1.0.20241103",

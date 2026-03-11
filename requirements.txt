@@ -1,7 +1,7 @@
 chia-blockchain==2.4.4
 blspy==2.0.3
 setuptools~=75.6.0
-aiosqlite==0.20.0
+aiosqlite==0.22.1
 aiohttp==3.13.3
 pytest==8.3.4
 PyYAML==6.0.2

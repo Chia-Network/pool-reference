@@ -17,7 +17,7 @@ dependencies = [
     "chia-blockchain==2.4.4",
     "chia_rs>=0.5.2",
     "setuptools>=56.1,<75.7",
-    "aiosqlite==0.20.0",
+    "aiosqlite==0.22.1",
     "aiohttp==3.13.3",
     "pytest==8.3.4",
     "PyMySQL==1.1.1",

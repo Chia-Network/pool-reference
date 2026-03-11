@@ -19,7 +19,7 @@ dependencies = [
     "setuptools>=56.1,<75.7",
     "aiosqlite==0.20.0",
     "aiohttp==3.13.3",
-    "pytest==8.3.4",
+    "pytest==9.0.2",
     "PyMySQL==1.1.1",
 ]
 

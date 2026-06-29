@@ -16,8 +16,8 @@ from ..util import RequestMetadata
 from .abstract import AbstractPoolStore
 
 pymysql.converters.encoders[uint64] = pymysql.converters.escape_int
-pymysql.converters.conversions = pymysql.converters.encoders.copy()  # type:ignore
-pymysql.converters.conversions.update(pymysql.converters.decoders)  # type:ignore
+pymysql.converters.conversions = pymysql.converters.encoders.copy()  # type: ignore
+pymysql.converters.conversions.update(pymysql.converters.decoders)  # type: ignore
 
 
 class MariadbPoolStore(AbstractPoolStore):

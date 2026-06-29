@@ -1,11 +1,15 @@
 name: black-action
-on: [push, pull_request]
+on: 
+  push:
+    branches: main
+  pull_request:
 jobs:
   linter_name:
     name: runner & black formatter
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+
       - uses: psf/black@stable
         with:
           black_args: ". --check"

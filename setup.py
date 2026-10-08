@@ -20,7 +20,7 @@ dependencies = [
     "aiosqlite==0.20.0",
     "aiohttp==3.14.1",
     "pytest==9.0.3",
-    "PyMySQL==1.1.1",
+    "PyMySQL==1.2.3",
 ]
 
 dev_dependencies = [

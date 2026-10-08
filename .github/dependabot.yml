@@ -16,7 +16,7 @@ updates:
       - dependencies
       - go
       - "Changed"
-    reviewers: ["cmmarslender", "Starttoaster"]
+    reviewers: ["cameroncooper", "emlowe"]
     groups:
       global:
         patterns:
@@ -50,7 +50,7 @@ updates:
       - dependencies
       - github_actions
       - "Changed"
-    reviewers: ["cmmarslender", "Starttoaster", "pmaslana"]
+    reviewers: ["cameroncooper", "emlowe"]
 
   - package-ecosystem: "npm"
     directory: /
@@ -65,7 +65,7 @@ updates:
       - dependencies
       - javascript
       - "Changed"
-    reviewers: ["cmmarslender", "ChiaMineJP"]
+    reviewers: ["emlowe", "seeden"]
 
   - package-ecosystem: cargo
     directory: /
